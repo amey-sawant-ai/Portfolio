@@ -1,26 +1,187 @@
 @import "tailwindcss";
 
+/*
+ * =============================================================================
+ * COSMIC DARK THEME SYSTEM
+ * =============================================================================
+ * A futuristic, space-inspired design system for Amey Sawant's portfolio.
+ *
+ * Design tokens are defined as CSS custom properties and mapped to Tailwind
+ * via @theme. This ensures consistency between Tailwind utilities and
+ * custom CSS while keeping the theme easily customizable.
+ * =============================================================================
+ */
+
+/* --------------------------------------------------------------------------
+   Design Tokens — Dark Cosmic Theme (default)
+   --------------------------------------------------------------------------
+   The portfolio uses a permanent dark theme to match the cosmic/space
+   aesthetic. Light mode is intentionally omitted — the universe is dark.
+   -------------------------------------------------------------------------- */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Surface colors — layered depth system */
+  --background: #050510;          /* Deep space black */
+  --background-secondary: #0a0a1a; /* Slightly elevated surface */
+  --background-tertiary: #12122a;  /* Card / elevated component background */
+
+  /* Foreground colors */
+  --foreground: #e8e8f0;          /* Primary text — soft white */
+  --foreground-muted: #8888a0;    /* Secondary text — muted lavender */
+
+  /* Accent colors — cosmic glow */
+  --accent: #6C3CE1;              /* Primary accent — electric violet */
+  --accent-glow: #00E5FF;         /* Secondary accent — cyan glow */
+  --accent-warm: #FF6B6B;         /* Warm accent — for alerts / emphasis */
+
+  /* Border & divider */
+  --border: rgba(136, 136, 160, 0.15);
+
+  /* Glow effects — for neon/glassmorphism elements */
+  --glow-primary: rgba(108, 60, 225, 0.4);
+  --glow-secondary: rgba(0, 229, 255, 0.3);
+
+  /* Transitions */
+  --transition-duration: 0.3s;
+  --transition-easing: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* --------------------------------------------------------------------------
+   Tailwind Theme Integration
+   --------------------------------------------------------------------------
+   Maps CSS custom properties to Tailwind color utilities.
+   Usage: bg-background, text-foreground, border-border, text-accent, etc.
+   -------------------------------------------------------------------------- */
 @theme inline {
   --color-background: var(--background);
+  --color-background-secondary: var(--background-secondary);
+  --color-background-tertiary: var(--background-tertiary);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-foreground-muted: var(--foreground-muted);
+  --color-accent: var(--accent);
+  --color-accent-glow: var(--accent-glow);
+  --color-accent-warm: var(--accent-warm);
+  --color-border: var(--border);
+
+  /* Font family mapping */
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-mono: var(--font-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* --------------------------------------------------------------------------
+   Base Styles
+   -------------------------------------------------------------------------- */
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body), system-ui, -apple-system, sans-serif;
+  line-height: 1.6;
+}
+
+/* --------------------------------------------------------------------------
+   Selection styles — cosmic accent highlight
+   -------------------------------------------------------------------------- */
+::selection {
+  background: var(--accent);
+  color: var(--foreground);
+}
+
+::-moz-selection {
+  background: var(--accent);
+  color: var(--foreground);
+}
+
+/* --------------------------------------------------------------------------
+   Scrollbar styles — thin, dark, on-brand
+   -------------------------------------------------------------------------- */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--foreground-muted);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--foreground-muted) var(--background);
+}
+
+/* --------------------------------------------------------------------------
+   Focus styles — accessible, visible, on-brand
+   -------------------------------------------------------------------------- */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   Utility classes for the cosmic theme
+   --------------------------------------------------------------------------
+   These are custom utilities beyond Tailwind's defaults,
+   specifically designed for the futuristic aesthetic.
+   -------------------------------------------------------------------------- */
+
+/* Glassmorphism card */
+.glass {
+  background: rgba(10, 10, 26, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+}
+
+/* Cosmic text glow effect */
+.text-glow {
+  text-shadow: 0 0 20px var(--glow-primary), 0 0 40px var(--glow-primary);
+}
+
+/* Accent glow for interactive elements */
+.glow-accent {
+  box-shadow: 0 0 15px var(--glow-primary), 0 0 30px rgba(108, 60, 225, 0.2);
+}
+
+/* Cyan glow variant */
+.glow-cyan {
+  box-shadow: 0 0 15px var(--glow-secondary), 0 0 30px rgba(0, 229, 255, 0.15);
+}
+
+/* Gradient text utility */
+.text-gradient {
+  background: linear-gradient(135deg, var(--accent), var(--accent-glow));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* --------------------------------------------------------------------------
+   Performance: Reduce motion for users who prefer it
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
