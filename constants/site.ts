@@ -14,7 +14,7 @@ export const SITE_CONFIG = {
 
   /** Site description for SEO and Open Graph */
   description:
-    "Portfolio of Amey Sawant — a full stack developer crafting immersive, cinematic web experiences with cutting-edge technology.",
+    "Futuristic portfolio of Amey Sawant showcasing AI, web development, 3D experiences and creative engineering projects.",
 
   /** Production domain (without protocol) */
   domain: "ameysawant.in",
@@ -31,7 +31,7 @@ export const SITE_CONFIG = {
   /** Social and contact links */
   social: {
     github: "https://github.com/amey-sawant-ai",
-    linkedin: "https://linkedin.com/in/ameysawant",
+    linkedin: "https://linkedin.com/in/amey-sawant-ai",
     twitter: "@ameysawant",
     email: "amey123sawant@gmail.com",
   },
