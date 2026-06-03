@@ -327,6 +327,27 @@ export function StoryCanvas({ activeStage }: StoryCanvasProps) {
           rockCenterY = height * 0.45 + mouse.y;
         }
 
+        // Draw 3D target coordinates scan rings around the asteroid
+        if (stage !== 0 && stage !== 4) {
+          ctx.save();
+          ctx.strokeStyle = `rgba(0, 229, 255, ${0.16 * currentCoreScale})`;
+          ctx.lineWidth = 0.5;
+          ctx.setLineDash([5, 8]);
+          
+          // Outer scan orbit ring
+          ctx.beginPath();
+          ctx.arc(rockCenterX, rockCenterY, 135 * currentCoreScale, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Tilted scanner coordinate ring
+          ctx.strokeStyle = `rgba(108, 60, 225, ${0.15 * currentCoreScale})`;
+          ctx.beginPath();
+          ctx.ellipse(rockCenterX, rockCenterY, 165 * currentCoreScale, 55 * currentCoreScale, rockAngleY, 0, Math.PI * 2);
+          ctx.stroke();
+          
+          ctx.restore();
+        }
+
         const projectedPoints: { x: number; y: number; z: number }[] = [];
         const scale = currentCoreScale;
 
