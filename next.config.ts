@@ -54,6 +54,16 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        /* Force correct MIME type for videos under nosniff header policy */
+        source: "/images/:path*.mp4",
+        headers: [
+          {
+            key: "Content-Type",
+            value: "video/mp4",
+          },
+        ],
+      },
+      {
         /* Cache 3D models and textures aggressively */
         source: "/models/(.*)",
         headers: [

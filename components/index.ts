@@ -11,3 +11,5 @@
  * export { ProjectCard } from "./project-card";
  * export { CosmicBackground } from "./cosmic-background";
  */
+
+export { CinematicLoader } from "./CinematicLoader";
