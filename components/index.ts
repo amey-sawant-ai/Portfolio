@@ -13,3 +13,4 @@
  */
 
 export { CinematicLoader } from "./CinematicLoader";
+export { StoryCanvas } from "./StoryCanvas";
