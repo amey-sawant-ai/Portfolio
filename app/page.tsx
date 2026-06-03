@@ -304,7 +304,7 @@ export default function Home() {
 
         {/* Stage 3: Trajectory */}
         <div 
-          className={`absolute inset-0 flex flex-col md:flex-row items-center justify-between px-10 md:px-32 py-24 z-30 transition-all duration-[1000ms] ease-out pointer-events-none gap-10
+          className={`absolute inset-0 flex flex-col md:flex-row-reverse items-center justify-between px-10 md:px-32 py-24 z-30 transition-all duration-[1000ms] ease-out pointer-events-none gap-10
             ${activeStage === 2 ? "opacity-100 translate-y-0 blur-0" : "opacity-0 translate-y-16 blur-md"}
           `}
         >
@@ -380,7 +380,7 @@ export default function Home() {
           </div>
 
           {/* Core Thermals Dashboard Widget */}
-          <div className="flex flex-col items-center justify-center pointer-events-auto md:w-2/5 select-none w-full">
+          <div className="flex flex-col items-center justify-start pt-12 md:pt-20 pointer-events-auto md:w-2/5 select-none w-full">
             <div className="w-full max-w-sm border border-white/10 rounded-lg p-5 bg-[#010103]/60 backdrop-blur shadow-2xl font-mono relative">
               <span className="absolute top-0 left-0 w-1.5 h-1.5 border-t border-l border-accent-warm" />
               <span className="absolute bottom-0 right-0 w-1.5 h-1.5 border-b border-r border-accent-warm" />

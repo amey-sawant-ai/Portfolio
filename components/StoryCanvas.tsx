@@ -127,6 +127,11 @@ export function StoryCanvas({ activeStage }: StoryCanvasProps) {
     let rockAngleY = 0;
     let rockAngleZ = 0;
 
+    let rockCenterX = width / 2;
+    let rockCenterY = height / 2;
+    let targetCenterX = width / 2;
+    let targetCenterY = height / 2;
+
     let fireParticles: Particle[] = [];
     let nebulaAngle = 0;
 
@@ -147,28 +152,41 @@ export function StoryCanvas({ activeStage }: StoryCanvasProps) {
         targetCoreScale = 0;
         targetWarpSpeed = 0.4;
         targetFireAlpha = 0;
+        targetCenterX = width / 2;
+        targetCenterY = height / 2;
       } else if (stage === 1) {
         targetCoreScale = 0.75;
         targetWarpSpeed = 0.6;
         targetFireAlpha = 0;
+        targetCenterX = width * 0.72; // Accretion on the Right
+        targetCenterY = height * 0.5;
       } else if (stage === 2) {
         targetCoreScale = 0.95;
         targetWarpSpeed = 16.0; // Warp Speed!
         targetFireAlpha = 0;
+        targetCenterX = width * 0.28; // Orbit on the Left
+        targetCenterY = height * 0.5;
       } else if (stage === 3) {
         targetCoreScale = 1.05;
         targetWarpSpeed = 2.5;
         targetFireAlpha = 1.0; // Flaming Meteorite!
+        targetCenterX = width * 0.75; // Plunge to Bottom-Right
+        targetCenterY = height * 0.58;
       } else if (stage === 4) {
         targetCoreScale = 0.65; // Embedded, slightly smaller
         targetWarpSpeed = 0.2;
         targetFireAlpha = 0;
+        targetCenterX = width / 2; // Crater at Center
+        targetCenterY = height * 0.45;
       }
 
       // Smooth Easing Interpolation
       currentCoreScale += (targetCoreScale - currentCoreScale) * 0.065;
       warpSpeed += (targetWarpSpeed - warpSpeed) * 0.05;
       fireAlpha += (targetFireAlpha - fireAlpha) * 0.08;
+      
+      rockCenterX += (targetCenterX - rockCenterX) * 0.055;
+      rockCenterY += (targetCenterY - rockCenterY) * 0.055;
 
       // Handle Impact Pulse Trigger
       if (stage === 4) {
@@ -251,9 +269,9 @@ export function StoryCanvas({ activeStage }: StoryCanvasProps) {
 
       // 4. Draw Atmospheric Entry Flame Particles (Stage 3)
       if (fireAlpha > 0.05) {
-        // Spawn fire particles relative to center of screen
-        const fx = width / 2 + mouse.x;
-        const fy = height / 2 + mouse.y;
+        // Spawn fire particles relative to the meteorite rock center
+        const fx = rockCenterX + mouse.x;
+        const fy = rockCenterY + mouse.y;
 
         if (Math.random() < 0.85 * fireAlpha) {
           // Sparks and flame trails flying back (towards top-right)
@@ -317,15 +335,9 @@ export function StoryCanvas({ activeStage }: StoryCanvasProps) {
           rockAngleZ = 0.2;
         }
 
-        // Set center position
-        let rockCenterX = width / 2 + mouse.x;
-        let rockCenterY = height / 2 + mouse.y;
-
-        if (stage === 4) {
-          // Embed rock slightly offset to match bottom layout
-          rockCenterX = width / 2 + mouse.x;
-          rockCenterY = height * 0.45 + mouse.y;
-        }
+        // Set center position including mouse parallax
+        const currentRockX = rockCenterX + mouse.x;
+        const currentRockY = rockCenterY + mouse.y;
 
         // Draw 3D target coordinates scan rings around the asteroid
         if (stage !== 0 && stage !== 4) {
@@ -336,13 +348,13 @@ export function StoryCanvas({ activeStage }: StoryCanvasProps) {
           
           // Outer scan orbit ring
           ctx.beginPath();
-          ctx.arc(rockCenterX, rockCenterY, 135 * currentCoreScale, 0, Math.PI * 2);
+          ctx.arc(currentRockX, currentRockY, 135 * currentCoreScale, 0, Math.PI * 2);
           ctx.stroke();
 
           // Tilted scanner coordinate ring
           ctx.strokeStyle = `rgba(108, 60, 225, ${0.15 * currentCoreScale})`;
           ctx.beginPath();
-          ctx.ellipse(rockCenterX, rockCenterY, 165 * currentCoreScale, 55 * currentCoreScale, rockAngleY, 0, Math.PI * 2);
+          ctx.ellipse(currentRockX, currentRockY, 165 * currentCoreScale, 55 * currentCoreScale, rockAngleY, 0, Math.PI * 2);
           ctx.stroke();
           
           ctx.restore();
@@ -376,8 +388,8 @@ export function StoryCanvas({ activeStage }: StoryCanvasProps) {
           pz = tempZ;
 
           const perspective = 400 / (400 + pz);
-          const sx = rockCenterX + px * perspective;
-          const sy = rockCenterY + py * perspective;
+          const sx = currentRockX + px * perspective;
+          const sy = currentRockY + py * perspective;
 
           projectedPoints.push({ x: sx, y: sy, z: pz });
         });
@@ -436,8 +448,8 @@ export function StoryCanvas({ activeStage }: StoryCanvasProps) {
       // 6. Draw Impact Shockwave & Cybernetic Circuit Grid (Stage 4)
       if (stage === 4 && shockwaveRadius > 0.05) {
         ctx.save();
-        const ix = width / 2 + mouse.x;
-        const iy = height * 0.45 + mouse.y;
+        const ix = rockCenterX + mouse.x;
+        const iy = rockCenterY + mouse.y;
 
         // Shockwave expansion ring
         ctx.strokeStyle = `rgba(0, 229, 255, ${0.38 * (1.0 - Math.min(1.0, shockwaveRadius / (Math.max(width, height) * 1.1)))})`;
