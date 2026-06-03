@@ -219,9 +219,16 @@ export default function Home() {
             <h2 className="text-3xl font-bold tracking-tight text-gradient text-glow mb-4 font-display uppercase">
               STELLAR SEED
             </h2>
-            <p className="text-[13px] text-foreground-muted leading-relaxed font-body mb-5">
-              I grew up in Mumbai, surrounded by technology but always curious about what existed behind the screen. As a kid, I wasn’t just interested in using games or apps — I wanted to understand how entire digital worlds were created. That curiosity slowly became an obsession. Watching futuristic movies, exploring the internet late at night, and discovering how developers could turn imagination into reality became the first spark that pulled me into technology.
-            </p>
+            <div className="text-[13px] text-foreground-muted leading-relaxed font-body mb-5 space-y-3">
+              <p>
+                <span className="text-accent-glow font-bold mr-1.5">[ORIGIN]</span>
+                Mumbai-born. Early curiosity for what happens behind the screen evolved into a passion for software design.
+              </p>
+              <p>
+                <span className="text-accent-glow font-bold mr-1.5">[MISSION]</span>
+                Inspired by the web and science fiction, I set out to master the tools that turn code into interactive universes.
+              </p>
+            </div>
             <div className="font-mono text-[11px] text-accent border-l-2 border-accent pl-3.5 italic py-0.5">
               "Coding wasn’t just programming — it was creation. It was the ability to build entire universes from nothing."
             </div>
@@ -268,9 +275,12 @@ export default function Home() {
             <h2 className="text-3xl font-bold tracking-tight text-gradient text-glow mb-3 font-display uppercase">
               ACCRETION CORE
             </h2>
-            <p className="text-[13px] text-foreground-muted leading-relaxed font-body mb-5">
-              I started building my foundation through web development and gradually expanded into AI, backend systems, and modern software engineering. The first technologies I learned were HTML, CSS, JavaScript, and Python.
-            </p>
+            <div className="text-[13px] text-foreground-muted leading-relaxed font-body mb-5 space-y-2">
+              <p>
+                <span className="text-accent-glow font-bold mr-1.5">[COALESCE]</span>
+                Consolidated core capabilities across full-stack frameworks, Python, and scalable backend architectures.
+              </p>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5 font-mono text-[10px]">
               {[
@@ -320,12 +330,16 @@ export default function Home() {
             <h2 className="text-3xl font-bold tracking-tight text-gradient text-glow mb-4 font-display uppercase">
               DEEP SPACE ORBIT
             </h2>
-            <p className="text-[13px] text-foreground-muted leading-relaxed font-body mb-4">
-              One of the defining parts of my journey has been building projects independently and constantly experimenting with ideas beyond traditional development. Instead of following only tutorials, I started designing original concepts that combined storytelling, visuals, and engineering.
-            </p>
-            <p className="text-[13px] text-foreground-muted leading-relaxed font-body mb-4">
-              The biggest challenge was learning everything without a clear roadmap: balancing design with development, understanding complex systems, improving consistency, and learning advanced technologies.
-            </p>
+            <div className="text-[13px] text-foreground-muted leading-relaxed font-body mb-5 space-y-3">
+              <p>
+                <span className="text-accent-glow font-bold mr-1.5">[TRAJECTORY]</span>
+                Moved beyond tutorials to build self-guided, highly visual products. Explored the space where art merges with clean algorithms.
+              </p>
+              <p>
+                <span className="text-accent-glow font-bold mr-1.5">[CHALLENGE]</span>
+                Mastered system integration, visual physics, and backend stability without a map.
+              </p>
+            </div>
             <div className="font-mono text-[11px] text-accent border-l-2 border-accent pl-3.5 italic py-0.5">
               "I learned how to adapt quickly, solve problems independently, and continue building even when things felt overwhelming."
             </div>
@@ -368,12 +382,16 @@ export default function Home() {
             <h2 className="text-3xl font-bold tracking-tight text-gradient text-glow mb-4 font-display uppercase">
               BURNING BRIGHT
             </h2>
-            <p className="text-[13px] text-foreground-muted leading-relaxed font-body mb-4">
-              One of the moments where I truly “burned bright” was when I began designing cinematic interactive experiences instead of normal websites. I pushed myself beyond standard portfolio design and started thinking like a creator building digital worlds.
-            </p>
-            <p className="text-[13px] text-foreground-muted leading-relaxed font-body mb-4">
-              The universe portfolio concept became a major milestone because it merges 3D systems, storytelling, animation, immersive UI, engineering, and personal identity into a single entity.
-            </p>
+            <div className="text-[13px] text-foreground-muted leading-relaxed font-body mb-5 space-y-3">
+              <p>
+                <span className="text-accent-glow font-bold mr-1.5">[ATMOSPHERE]</span>
+                Shifted focus to rich, high-fidelity interactive interfaces. Began crafting high-performance, memorable user journeys.
+              </p>
+              <p>
+                <span className="text-accent-glow font-bold mr-1.5">[MILESTONE]</span>
+                Merged 3D physics, real-time shaders, and immersive HUD controls into a single digital narrative.
+              </p>
+            </div>
             <div className="font-mono text-[11px] text-accent border-l-2 border-accent pl-3.5 italic py-0.5">
               "Instead of just making something functional, I started building experiences people could emotionally remember."
             </div>
@@ -430,9 +448,12 @@ export default function Home() {
             <h2 className="text-3xl font-bold tracking-tight text-gradient text-glow mb-3 font-display uppercase">
               THE IMPACT SITE
             </h2>
-            <p className="text-[13px] text-foreground-muted leading-relaxed font-body mb-5 max-w-lg mx-auto">
-              Right now, I’m building toward becoming a world-class engineer who merges AI, software engineering, cinematic design, and immersive digital experiences into one identity.
-            </p>
+            <div className="text-[13px] text-foreground-muted leading-relaxed font-body mb-5 max-w-lg mx-auto space-y-2">
+              <p>
+                <span className="text-accent-glow font-bold mr-1.5">[METAMORPHOSIS]</span>
+                Forging ahead to build premium software that brings together agentic workflows, clean architecture, and cinematic interfaces.
+              </p>
+            </div>
 
             <div className="font-mono text-xs text-white tracking-widest uppercase border-y border-white/10 py-3 mb-6 max-w-md mx-auto text-glow text-accent-glow">
               "I want people to see technology not just as tools, but as universes waiting to be created."
