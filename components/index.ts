@@ -14,3 +14,12 @@
 
 export { CinematicLoader } from "./CinematicLoader";
 export { StoryCanvas } from "./StoryCanvas";
+
+// Explorable Planet Worlds
+export { default as ProjectsWorld } from "./worlds/ProjectsWorld";
+export { default as SkillsWorld } from "./worlds/SkillsWorld";
+export { default as ExperienceWorld } from "./worlds/ExperienceWorld";
+export { default as ContactWorld } from "./worlds/ContactWorld";
+export { default as ResumeWorld } from "./worlds/ResumeWorld";
+export { default as CreatorWorld } from "./worlds/CreatorWorld";
+

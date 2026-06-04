@@ -1,522 +1,1575 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import React, { useRef, useMemo, useState, useEffect } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Points, PointMaterial, Html } from "@react-three/drei";
+import * as THREE from "three";
+import { gsap } from "gsap";
+import { audio } from "@/lib/audio";
+
+// Explorable Planet Worlds
+import ProjectsWorld from "./worlds/ProjectsWorld";
+import SkillsWorld from "./worlds/SkillsWorld";
+import ExperienceWorld from "./worlds/ExperienceWorld";
+import ContactWorld from "./worlds/ContactWorld";
+import ResumeWorld from "./worlds/ResumeWorld";
+import CreatorWorld from "./worlds/CreatorWorld";
 
 interface StoryCanvasProps {
-  activeStage: number;
+  activeSection: string;
+  onPlanetClick: (section: string) => void;
+  loaderProgress?: number;
 }
 
-interface Star {
-  x: number;
-  y: number;
-  z: number;
-  size: number;
-  opacity: number;
-}
+// -------------------------------------------------------------
+// 1. DETERMINISTIC SPECS & HELPER UTILITIES
+// -------------------------------------------------------------
 
-interface Particle {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  size: number;
-  alpha: number;
-  color: string;
-  life: number;
-  maxLife: number;
-}
+export const PLANET_SPECS = {
+  Earth: { radius: 10.5, orbitRadius: 110, orbitSpeed: 0.065, phase: 0.0, color: "#3B82F6" },
+  Mars: { radius: 7.7, orbitRadius: 160, orbitSpeed: 0.045, phase: 1.0, color: "#DC2626" },
+  Saturn: { radius: 16.8, orbitRadius: 220, orbitSpeed: 0.03, phase: 2.5, color: "#F59E0B" },
+  Neptune: { radius: 14.0, orbitRadius: 290, orbitSpeed: 0.02, phase: 4.0, color: "#06B6D4" },
+  Moon: { radius: 3.5, orbitRadius: 70, orbitSpeed: 0.095, phase: 5.0, color: "#9ca3af" }
+};
 
-interface Point3D {
-  x: number;
-  y: number;
-  z: number;
-  baseRadius: number;
-}
+// Generates organic, high-fidelity planet textures procedurally in memory using radial gradients
+function createProceduralTexture(type: string): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 256;
+  const ctx = canvas.getContext("2d")!;
 
-export function StoryCanvas({ activeStage }: StoryCanvasProps) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const activeStageRef = useRef(activeStage);
-  const animationFrameRef = useRef<number | null>(null);
+  if (type === "earth") {
+    // Deep Ocean Base
+    ctx.fillStyle = "#0c2340";
+    ctx.fillRect(0, 0, 512, 256);
 
-  useEffect(() => {
-    activeStageRef.current = activeStage;
-  }, [activeStage]);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    let width = (canvas.width = window.innerWidth);
-    let height = (canvas.height = window.innerHeight);
-
-    // Mouse tracking for parallax and reticle details
-    const mouse = { x: 0, y: 0, targetX: 0, targetY: 0 };
-    const handleMouseMove = (e: MouseEvent) => {
-      mouse.targetX = (e.clientX - window.innerWidth / 2) * 0.05;
-      mouse.targetY = (e.clientY - window.innerHeight / 2) * 0.05;
-    };
-    window.addEventListener("mousemove", handleMouseMove);
-
-    // Setup 3D Rock Vertices & Connections
-    const points: Point3D[] = [];
-    const latCount = 10;
-    const lonCount = 12;
-    // Generate procedural low-poly asteroid shape
-    for (let i = 0; i <= latCount; i++) {
-      const lat = (i / latCount) * Math.PI;
-      for (let j = 0; j < lonCount; j++) {
-        const lon = (j / lonCount) * Math.PI * 2;
-        
-        // Add random displacement noise to make the rock rough/rocky
-        const distortion = 1 + Math.sin(lat * 3) * Math.cos(lon * 4) * 0.22 + Math.cos(lat * 5 + lon * 2) * 0.08;
-        const r = 85 * distortion;
-        
-        const x = r * Math.sin(lat) * Math.cos(lon);
-        const y = r * Math.sin(lat) * Math.sin(lon);
-        const z = r * Math.cos(lat);
-        points.push({ x, y, z, baseRadius: r });
-      }
-    }
-
-    const connections: [number, number][] = [];
-    for (let i = 0; i < latCount; i++) {
-      for (let j = 0; j < lonCount; j++) {
-        const idx = i * lonCount + j;
-        const nextLatIdx = (i + 1) * lonCount + j;
-        const nextLonIdx = i * lonCount + ((j + 1) % lonCount);
-        
-        if (nextLatIdx < points.length) {
-          connections.push([idx, nextLatIdx]);
-        }
-        connections.push([idx, nextLonIdx]);
-      }
-    }
-
-    // Initialize 300 background stars for the zoom/warp effect
-    const stars: Star[] = [];
-    for (let i = 0; i < 300; i++) {
-      stars.push({
-        x: Math.random() * width - width / 2,
-        y: Math.random() * height - height / 2,
-        z: Math.random() * 1000,
-        size: Math.random() * 1.2 + 0.4,
-        opacity: Math.random() * 0.6 + 0.1,
-      });
-    }
-
-    // Initialize nebulae gas layers
-    const nebulas = [
-      { x: width * 0.3, y: height * 0.4, r: Math.min(width, height) * 0.6, color: "rgba(108, 60, 225, 0.04)" },
-      { x: width * 0.7, y: height * 0.6, r: Math.min(width, height) * 0.5, color: "rgba(0, 229, 255, 0.03)" },
-    ];
-
-    // Core variables that interpolate between stages
-    let currentCoreScale = 0;
-    let targetCoreScale = 0;
-    let warpSpeed = 0.5;
-    let targetWarpSpeed = 0.5;
-    let fireAlpha = 0;
-    let targetFireAlpha = 0;
-    let impactScale = 0;
-    let shockwaveRadius = 0;
-
-    let rockAngleX = 0;
-    let rockAngleY = 0;
-    let rockAngleZ = 0;
-
-    let rockCenterX = width / 2;
-    let rockCenterY = height / 2;
-    let targetCenterX = width / 2;
-    let targetCenterY = height / 2;
-
-    let fireParticles: Particle[] = [];
-    let nebulaAngle = 0;
-
-    const handleResize = () => {
-      width = canvas.width = window.innerWidth;
-      height = canvas.height = window.innerHeight;
-      nebulas[0].x = width * 0.3; nebulas[0].y = height * 0.4; nebulas[0].r = Math.min(width, height) * 0.6;
-      nebulas[1].x = width * 0.7; nebulas[1].y = height * 0.6; nebulas[1].r = Math.min(width, height) * 0.5;
-    };
-    window.addEventListener("resize", handleResize);
-
-    // Animation Loop
-    const animate = () => {
-      const stage = activeStageRef.current;
-
-      // Stage Target Parameters Easing
-      if (stage === 0) {
-        targetCoreScale = 0;
-        targetWarpSpeed = 0.4;
-        targetFireAlpha = 0;
-        targetCenterX = width / 2;
-        targetCenterY = height / 2;
-      } else if (stage === 1) {
-        targetCoreScale = 0.75;
-        targetWarpSpeed = 0.6;
-        targetFireAlpha = 0;
-        targetCenterX = width * 0.72; // Accretion on the Right
-        targetCenterY = height * 0.5;
-      } else if (stage === 2) {
-        targetCoreScale = 0.95;
-        targetWarpSpeed = 16.0; // Warp Speed!
-        targetFireAlpha = 0;
-        targetCenterX = width * 0.28; // Orbit on the Left
-        targetCenterY = height * 0.5;
-      } else if (stage === 3) {
-        targetCoreScale = 1.05;
-        targetWarpSpeed = 2.5;
-        targetFireAlpha = 1.0; // Flaming Meteorite!
-        targetCenterX = width * 0.75; // Plunge to Bottom-Right
-        targetCenterY = height * 0.58;
-      } else if (stage === 4) {
-        targetCoreScale = 0.65; // Embedded, slightly smaller
-        targetWarpSpeed = 0.2;
-        targetFireAlpha = 0;
-        targetCenterX = width / 2; // Crater at Center
-        targetCenterY = height * 0.45;
-      }
-
-      // Smooth Easing Interpolation
-      currentCoreScale += (targetCoreScale - currentCoreScale) * 0.065;
-      warpSpeed += (targetWarpSpeed - warpSpeed) * 0.05;
-      fireAlpha += (targetFireAlpha - fireAlpha) * 0.08;
+    // Draw organic blended landmasses
+    for (let i = 0; i < 45; i++) {
+      const cx = Math.random() * 512;
+      const cy = 35 + Math.random() * 186;
+      const r = Math.random() * 85 + 25;
       
-      rockCenterX += (targetCenterX - rockCenterX) * 0.055;
-      rockCenterY += (targetCenterY - rockCenterY) * 0.055;
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      grad.addColorStop(0, "#14532d"); // Forest green land core
+      grad.addColorStop(0.45, "#166534"); // Standard land green
+      grad.addColorStop(0.75, "#0d9488"); // Coastal teal transition
+      grad.addColorStop(1, "rgba(12, 35, 64, 0.0)"); // Soft ocean blend
+      
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
-      // Handle Impact Pulse Trigger
-      if (stage === 4) {
-        if (impactScale < 1.0) impactScale += 0.08;
-        shockwaveRadius += (Math.max(width, height) * 1.1 - shockwaveRadius) * 0.04;
-      } else {
-        impactScale = 0;
-        shockwaveRadius = 0;
+    // Add polar ice caps with blurred margins
+    const northCap = ctx.createLinearGradient(0, 0, 0, 45);
+    northCap.addColorStop(0, "#ffffff");
+    northCap.addColorStop(0.7, "rgba(255, 255, 255, 0.9)");
+    northCap.addColorStop(1, "rgba(255, 255, 255, 0.0)");
+    ctx.fillStyle = northCap;
+    ctx.fillRect(0, 0, 512, 45);
+
+    const southCap = ctx.createLinearGradient(0, 211, 0, 256);
+    southCap.addColorStop(0, "rgba(255, 255, 255, 0.0)");
+    southCap.addColorStop(0.3, "rgba(255, 255, 255, 0.9)");
+    southCap.addColorStop(1, "#ffffff");
+    ctx.fillStyle = southCap;
+    ctx.fillRect(0, 211, 512, 45);
+  } 
+  else if (type === "saturn") {
+    // Banded gas giant base
+    const grad = ctx.createLinearGradient(0, 0, 0, 256);
+    grad.addColorStop(0, "#271203");
+    grad.addColorStop(0.15, "#451a03");
+    grad.addColorStop(0.32, "#78350f");
+    grad.addColorStop(0.48, "#d97706");
+    grad.addColorStop(0.55, "#b45309");
+    grad.addColorStop(0.72, "#78350f");
+    grad.addColorStop(0.88, "#451a03");
+    grad.addColorStop(1.0, "#271203");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 512, 256);
+
+    // Render micro atmospheric bands with low opacity
+    for (let i = 0; i < 22; i++) {
+      const y = Math.random() * 256;
+      const h = Math.random() * 10 + 2;
+      ctx.fillStyle = "rgba(251, 191, 36, 0.07)";
+      ctx.fillRect(0, y, 512, h);
+    }
+  } 
+  else if (type === "mars") {
+    // Deep iron-oxide rust base
+    ctx.fillStyle = "#7c2d12";
+    ctx.fillRect(0, 0, 512, 256);
+
+    // Layered canyons, sands, and dust storms
+    for (let i = 0; i < 40; i++) {
+      const cx = Math.random() * 512;
+      const cy = Math.random() * 256;
+      const r = Math.random() * 95 + 20;
+
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      grad.addColorStop(0, "#451a03"); // Dark canyon trenches
+      grad.addColorStop(0.35, "#9a3412"); // Desert oxidation
+      grad.addColorStop(0.7, "#7c2d12"); // Ambient rust
+      grad.addColorStop(1, "rgba(124, 45, 18, 0.0)"); // Soft margin
+      
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // White ice poles
+    const capGrad = ctx.createRadialGradient(256, 0, 0, 256, 0, 30);
+    capGrad.addColorStop(0, "#ffffff");
+    capGrad.addColorStop(0.5, "#fed7aa");
+    capGrad.addColorStop(1, "rgba(124, 45, 18, 0.0)");
+    ctx.fillStyle = capGrad;
+    ctx.beginPath();
+    ctx.arc(256, 0, 30, 0, Math.PI * 2);
+    ctx.fill();
+  } 
+  else if (type === "neptune") {
+    // Gaseous deep blue base
+    const grad = ctx.createLinearGradient(0, 0, 0, 256);
+    grad.addColorStop(0, "#082f49");
+    grad.addColorStop(0.35, "#0284c7");
+    grad.addColorStop(0.65, "#0369a1");
+    grad.addColorStop(1.0, "#082f49");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 512, 256);
+
+    // Swirling methane storm spots
+    for (let i = 0; i < 15; i++) {
+      const cx = Math.random() * 512;
+      const cy = Math.random() * 256;
+      const r = Math.random() * 55 + 15;
+
+      const stormGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      stormGrad.addColorStop(0, "rgba(34, 211, 238, 0.22)"); // Cyan storms
+      stormGrad.addColorStop(0.5, "rgba(3, 105, 161, 0.08)");
+      stormGrad.addColorStop(1, "rgba(8, 47, 73, 0.0)");
+
+      ctx.fillStyle = stormGrad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  else if (type === "moon") {
+    // Solid grey regolith base
+    ctx.fillStyle = "#374151";
+    ctx.fillRect(0, 0, 512, 256);
+
+    // Draw soft lava seas (Maria)
+    for (let i = 0; i < 10; i++) {
+      const cx = Math.random() * 512;
+      const cy = Math.random() * 256;
+      const r = Math.random() * 120 + 40;
+
+      const seaGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      seaGrad.addColorStop(0, "#1f2937"); // Lava sea core
+      seaGrad.addColorStop(0.6, "#374151"); // Sea margins
+      seaGrad.addColorStop(1, "rgba(55, 65, 81, 0.0)");
+
+      ctx.fillStyle = seaGrad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // High-impact craters with ejecta rays
+    for (let i = 0; i < 30; i++) {
+      const cx = Math.random() * 512;
+      const cy = Math.random() * 256;
+      const r = Math.random() * 14 + 3;
+
+      const craterGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      craterGrad.addColorStop(0, "#ffffff"); // Crater peak/center
+      craterGrad.addColorStop(0.18, "#9ca3af"); // Crater rim
+      craterGrad.addColorStop(0.4, "#4b5563"); // Outer floor
+      craterGrad.addColorStop(1, "rgba(55, 65, 81, 0.0)"); // Ejecta halo
+
+      ctx.fillStyle = craterGrad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.ClampToEdgeWrapping;
+  return texture;
+}
+
+// Generates Saturn's rings with divisions
+function createSaturnRingTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512;
+  canvas.height = 8;
+  const ctx = canvas.getContext("2d")!;
+  ctx.clearRect(0, 0, 512, 8);
+
+  const grad = ctx.createLinearGradient(0, 0, 512, 0);
+  grad.addColorStop(0, "rgba(251, 191, 36, 0.0)");
+  grad.addColorStop(0.15, "rgba(245, 158, 11, 0.55)");
+  grad.addColorStop(0.44, "rgba(245, 158, 11, 0.7)");
+  grad.addColorStop(0.48, "rgba(245, 158, 11, 0.02)"); 
+  grad.addColorStop(0.56, "rgba(251, 191, 36, 0.65)");
+  grad.addColorStop(1.0, "rgba(251, 191, 36, 0.0)");
+
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 512, 8);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  return texture;
+}
+
+// Generates a soft nebula cloud texture
+function createNebulaTexture(colorHex: string): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext("2d")!;
+
+  const grad = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+  const color = new THREE.Color(colorHex);
+  const r = Math.round(color.r * 255);
+  const g = Math.round(color.g * 255);
+  const b = Math.round(color.b * 255);
+
+  grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.25)`);
+  grad.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, 0.07)`);
+  grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0.0)`);
+
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 256, 256);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  return texture;
+}
+
+// Generates a soft glow flare for the sun rays
+function createSunRayTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext("2d")!;
+
+  const grad = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+  grad.addColorStop(0, "rgba(255, 120, 0, 0.4)");
+  grad.addColorStop(0.3, "rgba(255, 60, 0, 0.1)");
+  grad.addColorStop(1, "rgba(255, 0, 0, 0.0)");
+
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 256, 256);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  return texture;
+}
+
+// -------------------------------------------------------------
+// 2. CUSTOM SHADER DEFINITIONS
+// -------------------------------------------------------------
+
+const SunShaderMaterial = {
+  uniforms: {
+    time: { value: 0 },
+    glowColor: { value: new THREE.Color("#FF8C00") },
+    coreColor: { value: new THREE.Color("#FFF8E7") },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    varying vec3 vNormal;
+    void main() {
+      vUv = uv;
+      vNormal = normalize(normalMatrix * normal);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform float time;
+    uniform vec3 glowColor;
+    uniform vec3 coreColor;
+    varying vec2 vUv;
+    varying vec3 vNormal;
+
+    vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
+    float snoise(vec2 v){
+      const vec4 C = vec4(0.211324865405187, 0.366025403784439,
+               -0.577350269189626, 0.024390243902439);
+      vec2 i  = floor(v + dot(v, C.yy) );
+      vec2 x0 = v -   i + dot(i, C.xx);
+      vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+      vec4 x12 = x0.xyxy + C.xxzz;
+      x12.xy -= i1;
+      i = mod(i, 289.0);
+      vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0) ) + i.x + vec3(0.0, i1.x, 1.0) );
+      vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
+      m = m*m*m*m;
+      vec3 x = 2.0 * fract(p * C.www) - 1.0;
+      vec3 h = abs(x) - 0.5;
+      vec3 a0 = x - floor(x + 0.5);
+      vec3 g = sin(time * 0.6) * 0.05 + vec3(5.0, 3.0, 1.0);
+      vec3 ox = floor(x + 0.5);
+      vec3 a1 = h - ox;
+      vec3 r = 1.79284291400159 - 0.85373472095314 * ( a0*a0 + a1*a1 );
+      vec3 g1 = a0*vec3(x0.x, x12.x, x12.z) + a1*vec3(x0.y, x12.y, x12.w);
+      vec3 m1 = g1 * r;
+      return 130.0 * dot(m, m1);
+    }
+
+    void main() {
+      float dotProduct = clamp(dot(vNormal, vec3(0.0, 0.0, 1.0)), 0.0, 1.0);
+      float rim = 1.0 - dotProduct;
+      float glow = pow(rim, 3.0) * 1.5;
+      
+      float n = snoise(vUv * 5.0 - time * 0.3);
+      float n2 = snoise(vUv * 9.0 + time * 0.55) * 0.5;
+      float turbulence = (n + n2) * 0.5 + 0.5;
+      
+      vec3 base = mix(glowColor, coreColor, pow(dotProduct, 1.8));
+      vec3 finalColor = base + glowColor * (glow + turbulence * 0.22);
+      
+      gl_FragColor = vec4(finalColor, 1.0);
+    }
+  `
+};
+
+const CreatorShaderMaterial = {
+  uniforms: {
+    glowColor: { value: new THREE.Color("#FF8C00") },
+    opacity: { value: 1.0 }
+  },
+  vertexShader: `
+    varying vec3 vNormal;
+    varying vec3 vViewPosition;
+    void main() {
+      vNormal = normalize(normalMatrix * normal);
+      vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+      vViewPosition = -mvPosition.xyz;
+      gl_Position = projectionMatrix * mvPosition;
+    }
+  `,
+  fragmentShader: `
+    uniform vec3 glowColor;
+    uniform float opacity;
+    varying vec3 vNormal;
+    varying vec3 vViewPosition;
+    void main() {
+      vec3 normal = normalize(vNormal);
+      vec3 viewDir = normalize(vViewPosition);
+      float intensity = pow(1.0 - clamp(dot(normal, viewDir), 0.0, 1.0), 3.0);
+      gl_FragColor = vec4(glowColor * intensity * 1.8, intensity * 0.95 * opacity);
+    }
+  `
+};
+
+// -------------------------------------------------------------
+// 3. SUB-COMPONENTS
+// -------------------------------------------------------------
+
+// Trailing meteor during intro loading
+function Meteor({ progress }: { progress: number }) {
+  const meshRef = useRef<THREE.Mesh | null>(null);
+
+  // Starts at [-300, 150, -250], impact at [0, 0, 0] at progress = 25
+  const pos = useMemo(() => {
+    const factor = Math.min(progress / 25, 1.0);
+    const start = new THREE.Vector3(-320, 160, -260);
+    const end = new THREE.Vector3(0, 0, 0);
+    return new THREE.Vector3().lerpVectors(start, end, factor);
+  }, [progress]);
+
+  const trailCoords = useMemo(() => {
+    const coords = [];
+    for (let i = 0; i < 50; i++) {
+      coords.push(
+        (Math.random() - 0.5) * 5,
+        (Math.random() - 0.5) * 5,
+        (Math.random() - 0.5) * 20
+      );
+    }
+    return new Float32Array(coords);
+  }, []);
+
+  useFrame(({ clock }) => {
+    if (meshRef.current) {
+      meshRef.current.rotation.x = clock.getElapsedTime() * 2.0;
+      meshRef.current.rotation.y = clock.getElapsedTime() * 1.0;
+    }
+  });
+
+  return (
+    <group position={[pos.x, pos.y, pos.z]}>
+      {/* Meteor core */}
+      <mesh ref={meshRef}>
+        <sphereGeometry args={[3.2, 16, 16]} />
+        <meshBasicMaterial color="#ffffff" />
+      </mesh>
+      
+      {/* Meteor outer glow */}
+      <mesh scale={1.8}>
+        <sphereGeometry args={[3.2, 8, 8]} />
+        <meshBasicMaterial
+          color="#FF7800"
+          transparent
+          opacity={0.7}
+          blending={THREE.AdditiveBlending}
+        />
+      </mesh>
+
+      {/* Trailing particles */}
+      <points>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[trailCoords, 3]} />
+        </bufferGeometry>
+        <pointsMaterial
+          size={0.8}
+          color="#FF9F1C"
+          transparent
+          opacity={0.85}
+          sizeAttenuation
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </points>
+    </group>
+  );
+}
+
+// Impact explosion flash
+function ImpactFlash({ progress }: { progress: number }) {
+  const opacity = useMemo(() => {
+    if (progress < 25) return 0;
+    if (progress > 32) return 0;
+    // Fades out from 1.0 at 25 to 0.0 at 32
+    return 1.0 - (progress - 25) / 7;
+  }, [progress]);
+
+  if (opacity <= 0) return null;
+
+  return (
+    <mesh scale={160}>
+      <sphereGeometry args={[1, 16, 16]} />
+      <meshBasicMaterial
+        color="#FFF6E0"
+        transparent
+        opacity={opacity}
+        side={THREE.DoubleSide}
+        blending={THREE.AdditiveBlending}
+      />
+    </mesh>
+  );
+}
+
+// Warp Speed Hyperspace Lines
+function WarpLines({ active }: { active: boolean }) {
+  const linesRef = useRef<THREE.LineSegments | null>(null);
+
+  const lineData = useMemo(() => {
+    const points = [];
+    const count = 220;
+    for (let i = 0; i < count; i++) {
+      const x = (Math.random() - 0.5) * 450;
+      const y = (Math.random() - 0.5) * 450;
+      const z = -200 - Math.random() * 500;
+      // Start of line
+      points.push(new THREE.Vector3(x, y, z));
+      // End of line (stretched Z)
+      points.push(new THREE.Vector3(x, y, z - 120));
+    }
+    const geom = new THREE.BufferGeometry().setFromPoints(points);
+    return geom;
+  }, []);
+
+  useFrame(() => {
+    if (linesRef.current && active) {
+      linesRef.current.position.z += 22; // Warp speed past camera
+      if (linesRef.current.position.z > 500) {
+        linesRef.current.position.z = 0; // Loop wrap
       }
+    }
+  });
 
-      // Smooth Mouse Parallax
-      mouse.x += (mouse.targetX - mouse.x) * 0.05;
-      mouse.y += (mouse.targetY - mouse.y) * 0.05;
+  if (!active) return null;
 
-      // 1. Draw Space Backdrop
-      ctx.fillStyle = "#020206";
-      ctx.fillRect(0, 0, width, height);
+  return (
+    <lineSegments ref={linesRef} geometry={lineData}>
+      <lineBasicMaterial
+        color="#FFB03A"
+        transparent
+        opacity={0.8}
+        blending={THREE.AdditiveBlending}
+      />
+    </lineSegments>
+  );
+}
 
-      // 2. Draw Nebulae Clouds (rotating slightly)
-      nebulaAngle += 0.0006;
-      ctx.save();
-      nebulas.forEach((n, idx) => {
-        const pulse = 1 + Math.sin(nebulaAngle + idx) * 0.06;
-        const nx = n.x + mouse.x * 0.15;
-        const ny = n.y + mouse.y * 0.15;
-        const grad = ctx.createRadialGradient(nx, ny, 0, nx, ny, n.r * pulse);
-        grad.addColorStop(0, n.color);
-        grad.addColorStop(0.6, n.color.replace(/[\d.]+\)$/, "0.01)"));
-        grad.addColorStop(1, "rgba(0,0,0,0)");
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(nx, ny, n.r * pulse, 0, Math.PI * 2);
-        ctx.fill();
-      });
-      ctx.restore();
+// Towering Creator silhouette mesh group behind solar system
+function CelestialCreator({ opacity = 1.0 }: { opacity?: number }) {
+  const groupRef = useRef<THREE.Group | null>(null);
+  
+  const material = useMemo(() => {
+    return new THREE.ShaderMaterial({
+      ...CreatorShaderMaterial,
+      uniforms: {
+        glowColor: { value: new THREE.Color("#FF8C00") },
+        opacity: { value: opacity }
+      },
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+  }, []);
 
-      // 3. Draw Stars
-      // Stage 2 (Trajectory) draws streaked horizontal stars. Others draw dots/mild drifts.
-      ctx.save();
-      stars.forEach((star) => {
-        if (stage === 2) {
-          // Horizontal streak layout
-          star.x -= warpSpeed * 1.5;
-          if (star.x < -width / 2) {
-            star.x = width / 2;
-            star.y = Math.random() * height - height / 2;
-            star.z = 1000;
-          }
-          const sx = star.x + width / 2 + mouse.x * 0.1;
-          const sy = star.y + height / 2 + mouse.y * 0.1;
-          
-          ctx.strokeStyle = `rgba(255, 255, 255, ${star.opacity * 0.8})`;
-          ctx.lineWidth = star.size * 0.85;
-          ctx.beginPath();
-          ctx.moveTo(sx, sy);
-          ctx.lineTo(sx - warpSpeed * 2.8, sy);
-          ctx.stroke();
-        } else {
-          // Slow standard drift
-          star.z -= warpSpeed * 0.25;
-          if (star.z <= 0) {
-            star.z = 1000;
-            star.x = Math.random() * width - width / 2;
-            star.y = Math.random() * height - height / 2;
-          }
-          const k = 120 / star.z;
-          const sx = star.x * k + width / 2 + mouse.x * (k * 0.2);
-          const sy = star.y * k + height / 2 + mouse.y * (k * 0.2);
+  useEffect(() => {
+    material.uniforms.opacity.value = opacity;
+  }, [opacity, material]);
 
-          if (sx >= 0 && sx < width && sy >= 0 && sy < height) {
-            const size = star.size * k * 0.65;
-            ctx.fillStyle = `rgba(224, 242, 254, ${star.opacity})`;
-            ctx.beginPath();
-            ctx.arc(sx, sy, Math.max(0.3, Math.min(size, 2.5)), 0, Math.PI * 2);
-            ctx.fill();
-          }
-        }
-      });
-      ctx.restore();
+  const stardustData = useMemo(() => {
+    const coords = [];
+    const colors = [];
+    const count = 2800;
 
-      // 4. Draw Atmospheric Entry Flame Particles (Stage 3)
-      if (fireAlpha > 0.05) {
-        // Spawn fire particles relative to the meteorite rock center
-        const fx = rockCenterX + mouse.x;
-        const fy = rockCenterY + mouse.y;
+    const cHead = new THREE.Color("#fff8e7"); 
+    const cArms = new THREE.Color("#f97316"); 
 
-        if (Math.random() < 0.85 * fireAlpha) {
-          // Sparks and flame trails flying back (towards top-right)
-          const angle = -Math.PI / 4 + (Math.random() - 0.5) * 0.45; // angle of streak
-          const speed = Math.random() * 8 + 4;
-          const life = Math.random() * 25 + 15;
-          
-          const colors = [
-            "rgba(255, 60, 0, ",
-            "rgba(255, 140, 0, ",
-            "rgba(255, 200, 0, ",
-            "rgba(220, 30, 0, ",
-          ];
+    for (let i = 0; i < count; i++) {
+      const u = Math.random();
+      const v = Math.random();
+      const theta = u * 2.0 * Math.PI;
+      const phi = Math.acos(2.0 * v - 1.0);
+      const r = 25 + Math.random() * 6; // Halo radius
+      
+      coords.push(
+        r * Math.sin(phi) * Math.cos(theta),
+        r * Math.cos(phi) + 110, 
+        r * Math.sin(phi) * Math.sin(theta) - 130
+      );
 
-          fireParticles.push({
-            x: fx + (Math.random() - 0.5) * 60,
-            y: fy + (Math.random() - 0.5) * 60,
-            vx: Math.cos(angle) * speed,
-            vy: Math.sin(angle) * speed,
-            size: Math.random() * 5 + 2,
-            alpha: 1.0,
-            color: colors[Math.floor(Math.random() * colors.length)],
-            life,
-            maxLife: life
-          });
-        }
+      const mixC = cHead.clone().lerp(cArms, Math.random());
+      colors.push(mixC.r, mixC.g, mixC.b);
+    }
 
-        // Draw and update fire particles
-        fireParticles = fireParticles.filter((p) => {
-          p.x += p.vx;
-          p.y -= p.vy; // flying up-right
-          p.life--;
-          p.alpha = (p.life / p.maxLife) * fireAlpha;
-
-          ctx.save();
-          ctx.fillStyle = `${p.color}${p.alpha})`;
-          ctx.shadowColor = p.color.replace(/,$/, ")");
-          ctx.shadowBlur = 8;
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
-
-          return p.life > 0;
-        });
-      }
-
-      // 5. Draw 3D Asteroid Rock Core (Stages 1, 2, 3, 4)
-      if (currentCoreScale > 0.02) {
-        ctx.save();
-
-        // Asteroid core spins
-        if (stage !== 4) {
-          rockAngleX += 0.003;
-          rockAngleY += 0.0055;
-          rockAngleZ += 0.002;
-        } else {
-          // Stationary in impact
-          rockAngleX = 0.4;
-          rockAngleY = 0.6;
-          rockAngleZ = 0.2;
-        }
-
-        // Set center position including mouse parallax
-        const currentRockX = rockCenterX + mouse.x;
-        const currentRockY = rockCenterY + mouse.y;
-
-        // Draw 3D target coordinates scan rings around the asteroid
-        if (stage !== 0 && stage !== 4) {
-          ctx.save();
-          ctx.strokeStyle = `rgba(0, 229, 255, ${0.16 * currentCoreScale})`;
-          ctx.lineWidth = 0.5;
-          ctx.setLineDash([5, 8]);
-          
-          // Outer scan orbit ring
-          ctx.beginPath();
-          ctx.arc(currentRockX, currentRockY, 135 * currentCoreScale, 0, Math.PI * 2);
-          ctx.stroke();
-
-          // Tilted scanner coordinate ring
-          ctx.strokeStyle = `rgba(108, 60, 225, ${0.15 * currentCoreScale})`;
-          ctx.beginPath();
-          ctx.ellipse(currentRockX, currentRockY, 165 * currentCoreScale, 55 * currentCoreScale, rockAngleY, 0, Math.PI * 2);
-          ctx.stroke();
-          
-          ctx.restore();
-        }
-
-        const projectedPoints: { x: number; y: number; z: number }[] = [];
-        const scale = currentCoreScale;
-
-        // Apply 3D matrix math on asteroid core
-        points.forEach((p) => {
-          let px = p.x * scale;
-          let py = p.y * scale;
-          let pz = p.z * scale;
-
-          // Rotate Z
-          let tempX = px * Math.cos(rockAngleZ) - py * Math.sin(rockAngleZ);
-          let tempY = px * Math.sin(rockAngleZ) + py * Math.cos(rockAngleZ);
-          px = tempX;
-          py = tempY;
-
-          // Rotate Y
-          tempX = px * Math.cos(rockAngleY) - pz * Math.sin(rockAngleY);
-          let tempZ = px * Math.sin(rockAngleY) + pz * Math.cos(rockAngleY);
-          px = tempX;
-          pz = tempZ;
-
-          // Rotate X
-          tempY = py * Math.cos(rockAngleX) - pz * Math.sin(rockAngleX);
-          tempZ = py * Math.sin(rockAngleX) + pz * Math.cos(rockAngleX);
-          py = tempY;
-          pz = tempZ;
-
-          const perspective = 400 / (400 + pz);
-          const sx = currentRockX + px * perspective;
-          const sy = currentRockY + py * perspective;
-
-          projectedPoints.push({ x: sx, y: sy, z: pz });
-        });
-
-        // Determine glow / outline colors based on phase
-        let coreColor = `rgba(136, 136, 160, ${0.15 * currentCoreScale})`;
-        let wireColor = `rgba(136, 136, 160, ${0.45 * currentCoreScale})`;
-        let glowColor = "rgba(108, 60, 225, 0.4)";
-        let glowBlurVal = 4;
-
-        if (stage === 3) {
-          // Highly heated core
-          coreColor = `rgba(255, 90, 0, ${0.25 * fireAlpha})`;
-          wireColor = `rgba(255, 140, 0, ${0.75 * fireAlpha})`;
-          glowColor = "rgba(255, 80, 0, 0.75)";
-          glowBlurVal = 14;
-        } else if (stage === 4) {
-          // Metamorphosis - cyber grid cyan
-          coreColor = `rgba(0, 229, 255, ${0.08 * currentCoreScale})`;
-          wireColor = `rgba(0, 229, 255, ${0.55 * currentCoreScale})`;
-          glowColor = "rgba(0, 229, 255, 0.55)";
-          glowBlurVal = 8;
-        }
-
-        // Draw connections
-        ctx.strokeStyle = wireColor;
-        ctx.lineWidth = 0.55;
-        ctx.shadowColor = glowColor;
-        ctx.shadowBlur = glowBlurVal;
-
-        ctx.beginPath();
-        connections.forEach(([p1, p2]) => {
-          const pt1 = projectedPoints[p1];
-          const pt2 = projectedPoints[p2];
-          if (pt1 && pt2) {
-            ctx.moveTo(pt1.x, pt1.y);
-            ctx.lineTo(pt2.x, pt2.y);
-          }
-        });
-        ctx.stroke();
-
-        // Draw glowing intersection points
-        ctx.fillStyle = wireColor;
-        ctx.shadowBlur = 0; // disable glow for points to keep performance high
-        projectedPoints.forEach((pt, idx) => {
-          if (idx % 3 === 0) {
-            ctx.beginPath();
-            ctx.arc(pt.x, pt.y, pt.z < 0 ? 1.6 : 0.8, 0, Math.PI * 2);
-            ctx.fill();
-          }
-        });
-
-        ctx.restore();
-      }
-
-      // 6. Draw Impact Shockwave & Cybernetic Circuit Grid (Stage 4)
-      if (stage === 4 && shockwaveRadius > 0.05) {
-        ctx.save();
-        const ix = rockCenterX + mouse.x;
-        const iy = rockCenterY + mouse.y;
-
-        // Shockwave expansion ring
-        ctx.strokeStyle = `rgba(0, 229, 255, ${0.38 * (1.0 - Math.min(1.0, shockwaveRadius / (Math.max(width, height) * 1.1)))})`;
-        ctx.lineWidth = 1.5;
-        ctx.shadowColor = "rgba(0, 229, 255, 0.4)";
-        ctx.shadowBlur = 6;
-        ctx.beginPath();
-        ctx.arc(ix, iy, shockwaveRadius, 0, Math.PI * 2);
-        ctx.stroke();
-
-        // Draw digital circuit vectors radiating outwards
-        ctx.strokeStyle = "rgba(0, 229, 255, 0.08)";
-        ctx.lineWidth = 0.75;
-        ctx.shadowBlur = 0;
-        ctx.beginPath();
-        
-        // Draw grid lines pointing out from impact point
-        const segmentCount = 12;
-        for (let i = 0; i < segmentCount; i++) {
-          const angle = (i / segmentCount) * Math.PI * 2 + nebulaAngle * 0.2;
-          const r1 = 120;
-          const r2 = 380;
-          
-          const x1 = ix + Math.cos(angle) * r1;
-          const y1 = iy + Math.sin(angle) * r1;
-          
-          // bent line (circuit board trace style)
-          const bendAngle = angle + 0.35;
-          const x2 = x1 + Math.cos(bendAngle) * 80;
-          const y2 = y1 + Math.sin(bendAngle) * 80;
-          
-          const x3 = x2 + Math.cos(angle) * (r2 - r1 - 80);
-          const y3 = y2 + Math.sin(angle) * (r2 - r1 - 80);
-
-          ctx.moveTo(x1, y1);
-          ctx.lineTo(x2, y2);
-          ctx.lineTo(x3, y3);
-          
-          // Draw small diagnostic node dot at end
-          ctx.fillStyle = "rgba(0, 229, 255, 0.25)";
-          ctx.beginPath();
-          ctx.arc(x3, y3, 2, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        ctx.stroke();
-
-        ctx.restore();
-      }
-
-      animationFrameRef.current = requestAnimationFrame(animate);
-    };
-
-    animate();
-
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("resize", handleResize);
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
+    return {
+      positions: new Float32Array(coords),
+      colors: new Float32Array(colors)
     };
   }, []);
 
+  useFrame(({ clock }) => {
+    if (!groupRef.current) return;
+    const time = clock.getElapsedTime();
+    groupRef.current.position.y = Math.sin(time * 0.8) * 1.8;
+  });
+
   return (
-    <canvas
-      ref={canvasRef}
-      className="absolute inset-0 w-full h-full block pointer-events-none transition-opacity duration-1000 z-10"
-    />
+    <group ref={groupRef}>
+      {/* 3D Head Silhouette */}
+      <mesh position={[0, 110, -135]}>
+        <sphereGeometry args={[26, 32, 32]} />
+        <primitive object={material} attach="material" />
+      </mesh>
+
+      {/* Torso Cylinder */}
+      <mesh position={[0, 50, -135]}>
+        <cylinderGeometry args={[20, 28, 90, 32]} />
+        <primitive object={material} attach="material" />
+      </mesh>
+
+      {/* Shoulders */}
+      <mesh position={[-28, 85, -135]}>
+        <sphereGeometry args={[14, 16, 16]} />
+        <primitive object={material} attach="material" />
+      </mesh>
+      <mesh position={[28, 85, -135]}>
+        <sphereGeometry args={[14, 16, 16]} />
+        <primitive object={material} attach="material" />
+      </mesh>
+
+      {/* Left Arm bending forward */}
+      <mesh position={[-90, 65, -80]} rotation={[0.4, 0.4, -0.6]}>
+        <cylinderGeometry args={[8, 6, 75, 16]} />
+        <primitive object={material} attach="material" />
+      </mesh>
+
+      {/* Right Arm bending forward */}
+      <mesh position={[90, 65, -80]} rotation={[0.4, -0.4, 0.6]}>
+        <cylinderGeometry args={[8, 6, 75, 16]} />
+        <primitive object={material} attach="material" />
+      </mesh>
+
+      {/* Hands representing creation control anchors */}
+      <mesh position={[-140, 50, 20]}>
+        <sphereGeometry args={[9, 16, 16]} />
+        <primitive object={material} attach="material" />
+      </mesh>
+      <mesh position={[140, 50, 20]}>
+        <sphereGeometry args={[9, 16, 16]} />
+        <primitive object={material} attach="material" />
+      </mesh>
+
+      {/* Stardust Halo Particles */}
+      <points>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[stardustData.positions, 3]} />
+          <bufferAttribute attach="attributes-color" args={[stardustData.colors, 3]} />
+        </bufferGeometry>
+        <pointsMaterial
+          size={0.7}
+          vertexColors
+          transparent
+          opacity={0.4 * opacity}
+          sizeAttenuation
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </points>
+    </group>
+  );
+}
+
+// Background Deep Space Nebula Clouds
+function CosmicNebula() {
+  const meshRef = useRef<THREE.Group | null>(null);
+
+  const clouds = useMemo(() => {
+    return [
+      { scale: 360, speed: 0.01, z: -190, rot: [0, 0, 0], tex: createNebulaTexture("#7C3AED") }, 
+      { scale: 320, speed: -0.007, z: -160, rot: [0, 0, 1.2], tex: createNebulaTexture("#F97316") }, 
+      { scale: 280, speed: 0.005, z: -130, rot: [0.8, 0, 0.4], tex: createNebulaTexture("#06B6D4") } 
+    ];
+  }, []);
+
+  useFrame(({ clock }) => {
+    if (!meshRef.current) return;
+    const t = clock.getElapsedTime();
+    meshRef.current.children.forEach((child, idx) => {
+      const cloud = clouds[idx];
+      child.rotation.z = t * cloud.speed;
+    });
+  });
+
+  return (
+    <group ref={meshRef}>
+      {clouds.map((cloud, i) => (
+        <mesh key={i} position={[0, 0, cloud.z]} rotation={cloud.rot as any}>
+          <planeGeometry args={[cloud.scale, cloud.scale]} />
+          <meshBasicMaterial
+            map={cloud.tex}
+            transparent
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+          />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+// Rotating Spiral Galaxy in the background
+function SpiralGalaxy() {
+  const pointsRef = useRef<THREE.Points | null>(null);
+  
+  const galaxyData = useMemo(() => {
+    const coords = [];
+    const colors = [];
+    const count = 2200;
+    const arms = 2;
+    const cCore = new THREE.Color("#fbcfe8"); 
+    const cArm = new THREE.Color("#8b5cf6"); 
+    
+    for (let i = 0; i < count; i++) {
+      const armIdx = i % arms;
+      const distance = Math.pow(Math.random(), 2.0) * 160 + 10;
+      const angle = (distance * 0.05) + (armIdx * Math.PI) + (Math.random() - 0.5) * 0.25;
+      
+      const x = Math.cos(angle) * distance;
+      const z = Math.sin(angle) * distance;
+      const y = (Math.random() - 0.5) * 10 * (1.0 - distance / 160);
+      
+      coords.push(x + 150, y - 80, z - 170); 
+      
+      const color = cCore.clone().lerp(cArm, distance / 160);
+      colors.push(color.r, color.g, color.b);
+    }
+    
+    return {
+      positions: new Float32Array(coords),
+      colors: new Float32Array(colors)
+    };
+  }, []);
+
+  useFrame(({ clock }) => {
+    if (pointsRef.current) {
+      pointsRef.current.rotation.y = clock.getElapsedTime() * 0.003;
+    }
+  });
+
+  return (
+    <points ref={pointsRef}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[galaxyData.positions, 3]} />
+        <bufferAttribute attach="attributes-color" args={[galaxyData.colors, 3]} />
+      </bufferGeometry>
+      <pointsMaterial
+        size={0.55}
+        vertexColors
+        transparent
+        opacity={0.22}
+        sizeAttenuation
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+      />
+    </points>
+  );
+}
+
+// Particle Cosmic Starfield with warp scale capability
+function Starfield({ warp }: { warp: boolean }) {
+  const farStars = useMemo(() => {
+    const coords = [];
+    const count = 7000;
+    for (let i = 0; i < count; i++) {
+      const radius = 400 + Math.random() * 600;
+      const theta = Math.random() * 2.0 * Math.PI;
+      const phi = Math.acos(2.0 * Math.random() - 1.0);
+      coords.push(
+        radius * Math.sin(phi) * Math.cos(theta),
+        radius * Math.cos(phi),
+        radius * Math.sin(phi) * Math.sin(theta)
+      );
+    }
+    return new Float32Array(coords);
+  }, []);
+
+  const nearStars = useMemo(() => {
+    const coords = [];
+    const count = 1200;
+    for (let i = 0; i < count; i++) {
+      const radius = 200 + Math.random() * 200;
+      const theta = Math.random() * 2.0 * Math.PI;
+      const phi = Math.acos(2.0 * Math.random() - 1.0);
+      coords.push(
+        radius * Math.sin(phi) * Math.cos(theta),
+        radius * Math.cos(phi),
+        radius * Math.sin(phi) * Math.sin(theta)
+      );
+    }
+    return new Float32Array(coords);
+  }, []);
+
+  const farRef = useRef<THREE.Points | null>(null);
+  const nearRef = useRef<THREE.Points | null>(null);
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    if (farRef.current) {
+      farRef.current.rotation.y = t * 0.0012;
+      // Stretches star meshes during warp transitions
+      farRef.current.scale.z = warp ? 3.5 : 1.0;
+    }
+    if (nearRef.current) {
+      nearRef.current.rotation.y = t * 0.004;
+      nearRef.current.scale.z = warp ? 5.0 : 1.0;
+    }
+  });
+
+  return (
+    <group>
+      <Points ref={farRef} positions={farStars} stride={3}>
+        <PointMaterial
+          size={0.45}
+          color="#e0e7ff"
+          transparent
+          opacity={0.5}
+          sizeAttenuation
+          depthWrite={false}
+        />
+      </Points>
+      <Points ref={nearRef} positions={nearStars} stride={3}>
+        <PointMaterial
+          size={0.8}
+          color="#ffedd5"
+          transparent
+          opacity={0.8}
+          sizeAttenuation
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </Points>
+    </group>
+  );
+}
+
+// Glowing Orbit Line Indicators
+function OrbitRing({ radius, color = "#FF9F1C", active, opacity = 1.0 }: { radius: number; color?: string; active?: boolean; opacity?: number }) {
+  const ring = useMemo(() => {
+    const points = [];
+    for (let i = 0; i <= 120; i++) {
+      const angle = (i / 120) * Math.PI * 2;
+      points.push(new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius));
+    }
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const material = new THREE.LineBasicMaterial({
+      color: new THREE.Color(color),
+      opacity: (active ? 0.55 : 0.14) * opacity, 
+      transparent: true
+    });
+    return new THREE.Line(geometry, material);
+  }, [radius, color, active, opacity]);
+
+  return <primitive object={ring} />;
+}
+
+// Detailed Asteroid Belt
+function AsteroidBelt({ opacity = 1.0 }: { opacity?: number }) {
+  const beltRef = useRef<THREE.Points | null>(null);
+
+  const beltData = useMemo(() => {
+    const coords = [];
+    const count = 450;
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2 + Math.random() * 0.08;
+      const dist = 188 + Math.random() * 22;
+      const y = (Math.random() - 0.5) * 6; 
+      coords.push(
+        Math.cos(angle) * dist,
+        y,
+        Math.sin(angle) * dist
+      );
+    }
+    return new Float32Array(coords);
+  }, []);
+
+  useFrame(({ clock }) => {
+    if (beltRef.current) {
+      beltRef.current.rotation.y = clock.getElapsedTime() * 0.007; 
+    }
+  });
+
+  return (
+    <Points ref={beltRef} positions={beltData} stride={3}>
+      <PointMaterial
+        size={0.65}
+        color="#a16207" 
+        transparent
+        opacity={0.35 * opacity}
+        sizeAttenuation
+        depthWrite={false}
+      />
+    </Points>
+  );
+}
+
+// Glowing Solar Wind particles flowing outward
+function SolarWind({ warp, opacity = 1.0 }: { warp: boolean; opacity?: number }) {
+  const pointsRef = useRef<THREE.Points | null>(null);
+  const count = 180;
+
+  const particles = useMemo(() => {
+    const data = [];
+    for (let i = 0; i < count; i++) {
+      data.push({
+        pos: new THREE.Vector3(0, 0, 0),
+        dir: new THREE.Vector3(
+          Math.random() - 0.5,
+          (Math.random() - 0.5) * 0.18, 
+          Math.random() - 0.5
+        ).normalize(),
+        speed: 0.65 + Math.random() * 0.75,
+        age: Math.random() * 110
+      });
+    }
+    return data;
+  }, []);
+
+  const posArray = useMemo(() => new Float32Array(count * 3), []);
+
+  useFrame(() => {
+    if (!pointsRef.current) return;
+    
+    particles.forEach((p, idx) => {
+      // Speeds up solar radiation wind during warping
+      const currentSpeed = p.speed * (warp ? 5.5 : 1.0);
+      p.pos.addScaledVector(p.dir, currentSpeed);
+      p.age += warp ? 4.0 : 1.0;
+      
+      if (p.pos.length() > 270 || p.age > 110) {
+        p.pos.set(0, 0, 0);
+        p.age = 0;
+        p.speed = 0.65 + Math.random() * 0.75;
+      }
+      
+      posArray[idx * 3] = p.pos.x;
+      posArray[idx * 3 + 1] = p.pos.y;
+      posArray[idx * 3 + 2] = p.pos.z;
+    });
+    
+    pointsRef.current.geometry.attributes.position.needsUpdate = true;
+  });
+
+  return (
+    <points ref={pointsRef}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[posArray, 3]} />
+      </bufferGeometry>
+      <pointsMaterial
+        size={0.65}
+        color="#fbbf24"
+        transparent
+        opacity={0.3 * opacity}
+        sizeAttenuation
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+      />
+    </points>
+  );
+}
+
+// Dynamic comets
+function ShootingComet() {
+  const cometRef = useRef<THREE.Mesh | null>(null);
+  
+  const trajectory = useMemo(() => {
+    return {
+      start: new THREE.Vector3(-350, 120, -180),
+      end: new THREE.Vector3(350, -100, -80),
+      speed: 2.8,
+      current: new THREE.Vector3(-350, 120, -180)
+    };
+  }, []);
+
+  useFrame(() => {
+    if (!cometRef.current) return;
+    
+    const direction = new THREE.Vector3().subVectors(trajectory.end, trajectory.start).normalize();
+    trajectory.current.addScaledVector(direction, trajectory.speed);
+    cometRef.current.position.copy(trajectory.current);
+    
+    if (trajectory.current.x > trajectory.end.x) {
+      trajectory.current.copy(trajectory.start);
+      trajectory.start.set(-350, 80 + Math.random() * 100, -200 - Math.random() * 100);
+      trajectory.end.set(350, -60 - Math.random() * 80, -80 + Math.random() * 60);
+      trajectory.speed = 2.4 + Math.random() * 1.2;
+    }
+  });
+
+  return (
+    <mesh ref={cometRef}>
+      <sphereGeometry args={[0.7, 8, 8]} />
+      <meshBasicMaterial
+        color="#ffffff"
+        transparent
+        opacity={0.8}
+        blending={THREE.AdditiveBlending}
+      />
+    </mesh>
+  );
+}
+
+// Planet Glow atmosphere
+function PlanetGlow({ radius, color, opacity = 1.0 }: { radius: number; color: string; opacity?: number }) {
+  return (
+    <mesh scale={1.25}>
+      <sphereGeometry args={[radius, 16, 16]} />
+      <meshBasicMaterial
+        color={color}
+        transparent
+        opacity={0.18 * opacity}
+        blending={THREE.AdditiveBlending}
+        side={THREE.BackSide}
+      />
+    </mesh>
+  );
+}
+
+// Orbiting particles around each planet
+function PlanetParticles({ radius, color }: { radius: number; color: string }) {
+  const pointsRef = useRef<THREE.Points | null>(null);
+  
+  const particles = useMemo(() => {
+    const coords = [];
+    const count = 50;
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2 + Math.random() * 0.15;
+      const r = radius * (1.35 + Math.random() * 0.35); 
+      const y = (Math.random() - 0.5) * radius * 0.25;
+      coords.push(Math.cos(angle) * r, y, Math.sin(angle) * r);
+    }
+    return new Float32Array(coords);
+  }, [radius]);
+
+  useFrame(({ clock }) => {
+    if (pointsRef.current) {
+      pointsRef.current.rotation.y = clock.getElapsedTime() * 0.2;
+    }
+  });
+
+  return (
+    <points ref={pointsRef}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[particles, 3]} />
+      </bufferGeometry>
+      <pointsMaterial
+        size={0.4}
+        color={color}
+        transparent
+        opacity={0.65}
+        sizeAttenuation
+        depthWrite={false}
+        blending={THREE.AdditiveBlending}
+      />
+    </points>
+  );
+}
+
+// Planet Node component
+interface PlanetProps {
+  name: string;
+  role: string;
+  radius: number;
+  orbitRadius: number;
+  orbitSpeed: number;
+  color: string;
+  texturePattern?: string; 
+  onClick: () => void;
+  hoverScale?: number;
+  onHoverChange: (hovered: boolean) => void;
+  expansionFactor?: number;
+}
+
+function Planet({ name, role, radius, orbitRadius, orbitSpeed, color, texturePattern, onClick, hoverScale = 1.25, onHoverChange, expansionFactor = 1.0 }: PlanetProps) {
+  const planetRef = useRef<THREE.Mesh | null>(null);
+  const cloudsRef = useRef<THREE.Mesh | null>(null);
+  const [hovered, setHovered] = useState(false);
+
+  const planetTexture = useMemo(() => createProceduralTexture(texturePattern || ""), [texturePattern]);
+  const cloudsTexture = useMemo(() => createCloudsTexture(), []);
+  const saturnRingTex = useMemo(() => createSaturnRingTexture(), []);
+
+  // Generates procedural cloud texture
+  function createCloudsTexture(): THREE.CanvasTexture {
+    const canvas = document.createElement("canvas");
+    canvas.width = 512;
+    canvas.height = 256;
+    const ctx = canvas.getContext("2d")!;
+    ctx.clearRect(0, 0, 512, 256);
+    ctx.fillStyle = "rgba(255, 255, 255, 0.65)";
+    for (let i = 0; i < 30; i++) {
+      const cx = Math.random() * 512;
+      const cy = 20 + Math.random() * 216;
+      const r = Math.random() * 40 + 15;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.ClampToEdgeWrapping;
+    return texture;
+  }
+
+  useFrame(({ clock }) => {
+    if (!planetRef.current) return;
+    const time = clock.getElapsedTime();
+    
+    const spec = (PLANET_SPECS as any)[name];
+    const phase = spec ? spec.phase : 0.0;
+    
+    // Position scales dynamically with system birth expansion
+    const currentRadius = orbitRadius * expansionFactor;
+    const theta = phase + time * orbitSpeed;
+    const x = Math.cos(theta) * currentRadius;
+    const z = Math.sin(theta) * currentRadius;
+    
+    planetRef.current.position.set(x, 0, z);
+    planetRef.current.rotation.y += hovered ? 0.03 : 0.007;
+
+    if (cloudsRef.current) {
+      cloudsRef.current.rotation.y += hovered ? 0.045 : 0.011;
+      cloudsRef.current.rotation.x += 0.002;
+    }
+  });
+
+  const handlePointerOver = (e: any) => {
+    e.stopPropagation();
+    setHovered(true);
+    onHoverChange(true);
+    document.body.style.cursor = "pointer";
+    audio.playHoverSound();
+  };
+
+  const handlePointerOut = () => {
+    setHovered(false);
+    onHoverChange(false);
+    document.body.style.cursor = "default";
+  };
+
+  const handleMeshClick = (e: any) => {
+    e.stopPropagation();
+    onClick();
+  };
+
+  return (
+    <group>
+      <mesh
+        ref={planetRef}
+        onClick={handleMeshClick}
+        onPointerOver={handlePointerOver}
+        onPointerOut={handlePointerOut}
+        scale={(hovered ? hoverScale : 1.0) * Math.min(expansionFactor * 2.0, 1.0)}
+      >
+        <sphereGeometry args={[radius, 32, 32]} />
+        <meshStandardMaterial
+          map={planetTexture}
+          roughness={0.65}
+          metalness={0.15}
+          emissive={new THREE.Color(color)}
+          emissiveIntensity={hovered ? 0.12 : 0.01}
+        />
+
+        {/* Dynamic Atmosphere clouds */}
+        {(texturePattern === "earth" || texturePattern === "neptune") && (
+          <mesh ref={cloudsRef} scale={1.015}>
+            <sphereGeometry args={[radius, 32, 32]} />
+            <meshStandardMaterial
+              alphaMap={cloudsTexture}
+              transparent
+              color="#ffffff"
+              opacity={0.35}
+              blending={THREE.NormalBlending}
+              depthWrite={false}
+            />
+          </mesh>
+        )}
+
+        {/* Saturn Rings */}
+        {texturePattern === "saturn" && (
+          <mesh rotation={[Math.PI / 2.3, 0, 0]}>
+            <ringGeometry args={[radius * 1.5, radius * 2.3, 64]} />
+            <meshStandardMaterial
+              map={saturnRingTex}
+              transparent
+              opacity={0.8}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+        )}
+
+        {/* Volumetric glow */}
+        <PlanetGlow radius={radius} color={color} opacity={expansionFactor} />
+
+        {/* Stardust particles */}
+        <PlanetParticles radius={radius} color={color} />
+
+        {/* 3D Telemetry Hover Card */}
+        {hovered && expansionFactor >= 0.9 && (
+          <Html distanceFactor={32} position={[0, radius * 1.9, 0]}>
+            <div className="bg-black/90 border border-amber-500/40 text-[9px] font-mono text-white p-3 rounded shadow-[0_0_15px_rgba(245,158,11,0.25)] flex flex-col gap-1.5 w-44 pointer-events-none select-none tracking-widest whitespace-nowrap z-50">
+              <span className="text-amber-500 font-extrabold">// {name.toUpperCase()}_SECTOR</span>
+              <span className="text-[10px] text-white font-bold tracking-widest uppercase">{role}</span>
+              <span className="text-[7px] text-neutral-400">RAD: {radius} // DIST: {orbitRadius}</span>
+              <div className="w-full h-[1px] bg-white/10 my-0.5" />
+              <span className="text-[7.5px] text-neutral-300 animate-pulse">[ CHOOSE_DESTINATION ]</span>
+            </div>
+          </Html>
+        )}
+      </mesh>
+    </group>
+  );
+}
+
+// -------------------------------------------------------------
+// 4. MAIN GSAP CAMERA DIRECTOR
+// -------------------------------------------------------------
+
+function CameraDirector({ activeSection, currentWorld }: { activeSection: string; currentWorld: string }) {
+  const { camera } = useThree();
+  const transitionRef = useRef<{ tStart: number; active: boolean; targetSection: string }>({ tStart: 0, active: false, targetSection: "" });
+
+  useEffect(() => {
+    transitionRef.current = { tStart: Date.now(), active: true, targetSection: activeSection };
+  }, [activeSection]);
+
+  useFrame(({ clock }) => {
+    const elapsed = clock.getElapsedTime();
+    
+    // 1. Render World Internal Frame
+    if (currentWorld !== "home") {
+      if (currentWorld !== "experience") {
+        let targetPos = new THREE.Vector3(0, 20, 85);
+        if (currentWorld === "skills") targetPos.set(0, 45, 110);
+        if (currentWorld === "about") targetPos.set(0, 5, 80);
+        
+        camera.position.lerp(targetPos, 0.1);
+        camera.lookAt(new THREE.Vector3(0, currentWorld === "about" ? 5 : 12, 0));
+      }
+      return;
+    }
+
+    // 2. Render Solar System & Warping
+    const transition = transitionRef.current;
+    if (transition.active) {
+      const duration = 1200;
+      const factor = Math.min((Date.now() - transition.tStart) / duration, 1.0);
+      
+      if (transition.targetSection === "home") {
+        // Return back to standard overview
+        const targetPos = new THREE.Vector3(0, 70, 450);
+        camera.position.lerp(targetPos, 0.08);
+        camera.lookAt(new THREE.Vector3(0, 0, 0));
+        if (factor >= 1.0) transition.active = false;
+      } else {
+        // Zooming in towards target planet coordinates
+        let targetPos = new THREE.Vector3(0, 0, 0);
+        
+        if (transition.targetSection === "about") {
+          targetPos.set(0, 0, 45); // Sun core
+        } else {
+          const spec = (PLANET_SPECS as any)[
+            transition.targetSection === "projects" ? "Earth" :
+            transition.targetSection === "skills" ? "Saturn" :
+            transition.targetSection === "experience" ? "Mars" :
+            transition.targetSection === "contact" ? "Neptune" : "Moon"
+          ];
+          if (spec) {
+            const theta = spec.phase + elapsed * spec.orbitSpeed;
+            const px = Math.cos(theta) * spec.orbitRadius;
+            const pz = Math.sin(theta) * spec.orbitRadius;
+            // Align camera right in front of target orbiting coordinate
+            targetPos.set(px * 0.94, 2, pz * 0.94);
+          }
+        }
+        camera.position.lerp(targetPos, 0.08);
+        
+        if (transition.targetSection !== "about") {
+          camera.lookAt(targetPos);
+        } else {
+          camera.lookAt(new THREE.Vector3(0, 0, 0));
+        }
+
+        if (factor >= 1.0) transition.active = false;
+      }
+    } else {
+      // Normal overview drift
+      const t = clock.getElapsedTime();
+      const overviewPos = new THREE.Vector3(
+        Math.sin(t * 0.15) * 12,
+        70 + Math.cos(t * 0.12) * 8,
+        450
+      );
+      camera.position.lerp(overviewPos, 0.05);
+      camera.lookAt(new THREE.Vector3(0, 0, 0));
+    }
+  });
+
+  return null;
+}
+
+// -------------------------------------------------------------
+// 5. MAIN SCENE CANVAS
+// -------------------------------------------------------------
+
+export function StoryCanvas({ activeSection, onPlanetClick, loaderProgress = 100 }: StoryCanvasProps) {
+  const [currentWorld, setCurrentWorld] = useState("home");
+  const [hoveredPlanet, setHoveredPlanet] = useState<string | null>(null);
+  const [sunHovered, setSunHovered] = useState(false);
+
+  const sunGroupRef = useRef<THREE.Group | null>(null);
+  const sunMatRef = useRef<THREE.ShaderMaterial | null>(null);
+  const sunRayRef1 = useRef<THREE.Mesh | null>(null);
+  const sunRayRef2 = useRef<THREE.Mesh | null>(null);
+  const sunRayTex = useMemo(() => createSunRayTexture(), []);
+
+  // Delay mounting of actual worlds until camera finishes warp zoom
+  useEffect(() => {
+    if (activeSection === "home") {
+      setCurrentWorld("home");
+    } else {
+      const timer = setTimeout(() => {
+        setCurrentWorld(activeSection);
+      }, 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [activeSection]);
+
+  // Universe Story state modifiers
+  const isMeteorPhase = loaderProgress < 25;
+  const isExplosionPhase = loaderProgress >= 25 && loaderProgress < 30;
+  const isSunIgnitePhase = loaderProgress >= 25;
+  
+  const expansionFactor = useMemo(() => {
+    if (loaderProgress < 50) return 0;
+    return Math.min((loaderProgress - 50) / 25, 1.0);
+  }, [loaderProgress]);
+
+  const creatorOpacity = useMemo(() => {
+    if (loaderProgress < 75) return 0;
+    return Math.min((loaderProgress - 75) / 15, 1.0);
+  }, [loaderProgress]);
+
+  // Warp speed flags
+  const isWarping = activeSection !== "home" && currentWorld === "home";
+
+  const ShaderTimeUpdater = () => {
+    useFrame(({ clock }) => {
+      const t = clock.getElapsedTime();
+      
+      if (sunMatRef.current && isSunIgnitePhase) {
+        sunMatRef.current.uniforms.time.value = t;
+        
+        // Sun breathing animation scale & pulse
+        const igniteScale = loaderProgress < 50 
+          ? (loaderProgress - 25) / 25 
+          : 1.0;
+        
+        const glowPulse = (1.0 + Math.sin(t * 1.8) * 0.15) * igniteScale;
+        sunMatRef.current.uniforms.glowColor.value.set(
+          new THREE.Color("#FF8C00").clone().multiplyScalar(glowPulse)
+        );
+      }
+      
+      if (sunRayRef1.current) sunRayRef1.current.rotation.z = t * (isWarping ? 0.25 : 0.035);
+      if (sunRayRef2.current) sunRayRef2.current.rotation.z = -t * (isWarping ? 0.15 : 0.02);
+
+      if (sunGroupRef.current && isSunIgnitePhase) {
+        const baseScale = loaderProgress < 50 ? (loaderProgress - 25) / 25 : 1.0;
+        const breathingScale = baseScale * (1.0 + Math.sin(t * 1.5) * 0.03);
+        sunGroupRef.current.scale.set(breathingScale, breathingScale, breathingScale);
+      }
+    });
+    return null;
+  };
+
+  const handleSunPointerOver = (e: any) => {
+    if (loaderProgress < 90) return;
+    e.stopPropagation();
+    setSunHovered(true);
+    document.body.style.cursor = "pointer";
+    audio.playHoverSound();
+  };
+
+  const handleSunPointerOut = () => {
+    setSunHovered(false);
+    document.body.style.cursor = "default";
+  };
+
+  const handleBack = () => {
+    audio.playWarpOutSound();
+    onPlanetClick("home");
+  };
+
+  return (
+    <div className="absolute inset-0 z-10 w-full h-full pointer-events-auto bg-[#020205]">
+      <Canvas
+        camera={{ position: [0, 80, 450], fov: 45 }}
+        gl={{ antialias: true, alpha: false }}
+        onCreated={({ gl }) => {
+          gl.setClearColor(new THREE.Color("#020205"));
+          gl.toneMapping = THREE.ACESFilmicToneMapping;
+          gl.toneMappingExposure = 1.05;
+        }}
+      >
+        {/* Cinematic light system */}
+        <ambientLight intensity={0.03} />
+        {isSunIgnitePhase && (
+          <pointLight position={[0, 0, 0]} intensity={22} distance={900} decay={1.0} color="#FFD580" />
+        )}
+        <directionalLight position={[0, 100, -80]} intensity={0.3} color="#D8B4FE" />
+
+        {/* Global deep space elements */}
+        <Starfield warp={isWarping} />
+        {!isMeteorPhase && <CosmicNebula />}
+        {!isMeteorPhase && <SpiralGalaxy />}
+        <WarpLines active={isWarping} />
+
+        {/* CONDITIONAL RENDER: 3D Explorable World Internals */}
+        {currentWorld === "projects" && <ProjectsWorld onBack={handleBack} />}
+        {currentWorld === "skills" && <SkillsWorld onBack={handleBack} />}
+        {currentWorld === "experience" && <ExperienceWorld onBack={handleBack} />}
+        {currentWorld === "contact" && <ContactWorld onBack={handleBack} />}
+        {currentWorld === "resume" && <ResumeWorld onBack={handleBack} />}
+        {currentWorld === "about" && <CreatorWorld onBack={handleBack} />}
+
+        {/* CONDITIONAL RENDER: Solar System Overview (including transition warping) */}
+        {currentWorld === "home" && (
+          <>
+            {/* Story loading sequence nodes */}
+            {isMeteorPhase && <Meteor progress={loaderProgress} />}
+            {isExplosionPhase && <ImpactFlash progress={loaderProgress} />}
+
+            {/* Orbiting Navigation Planets */}
+            {expansionFactor > 0 && (
+              <>
+                {/* Orbit path rings */}
+                <OrbitRing radius={110} color="#3B82F6" active={hoveredPlanet === "Earth"} opacity={expansionFactor} /> 
+                <OrbitRing radius={160} color="#DC2626" active={hoveredPlanet === "Mars"} opacity={expansionFactor} /> 
+                <OrbitRing radius={220} color="#D97706" active={hoveredPlanet === "Saturn"} opacity={expansionFactor} /> 
+                <OrbitRing radius={290} color="#0891B2" active={hoveredPlanet === "Neptune"} opacity={expansionFactor} /> 
+                <OrbitRing radius={70} color="#9ca3af" active={hoveredPlanet === "Moon"} opacity={expansionFactor} /> 
+
+                {/* Earth (Projects) */}
+                <Planet
+                  name="Earth"
+                  role="Projects"
+                  radius={10.5} 
+                  orbitRadius={110}
+                  orbitSpeed={0.065}
+                  color="#3B82F6"
+                  texturePattern="earth"
+                  onClick={() => onPlanetClick("projects")}
+                  onHoverChange={(h) => setHoveredPlanet(h ? "Earth" : null)}
+                  expansionFactor={expansionFactor}
+                />
+
+                {/* Mars (Experience) */}
+                <Planet
+                  name="Mars"
+                  role="Experience"
+                  radius={7.7} 
+                  orbitRadius={160}
+                  orbitSpeed={0.045}
+                  color="#DC2626"
+                  texturePattern="mars"
+                  onClick={() => onPlanetClick("experience")}
+                  onHoverChange={(h) => setHoveredPlanet(h ? "Mars" : null)}
+                  expansionFactor={expansionFactor}
+                />
+
+                {/* Saturn (Skills) */}
+                <Planet
+                  name="Saturn"
+                  role="Skills"
+                  radius={16.8} 
+                  orbitRadius={220}
+                  orbitSpeed={0.03}
+                  color="#F59E0B"
+                  texturePattern="saturn"
+                  onClick={() => onPlanetClick("skills")}
+                  onHoverChange={(h) => setHoveredPlanet(h ? "Saturn" : null)}
+                  expansionFactor={expansionFactor}
+                />
+
+                {/* Neptune (Contact) */}
+                <Planet
+                  name="Neptune"
+                  role="Contact"
+                  radius={14.0} 
+                  orbitRadius={290}
+                  orbitSpeed={0.02}
+                  color="#06B6D4"
+                  texturePattern="neptune"
+                  onClick={() => onPlanetClick("contact")}
+                  onHoverChange={(h) => setHoveredPlanet(h ? "Neptune" : null)}
+                  expansionFactor={expansionFactor}
+                />
+
+                {/* Moon (Resume) */}
+                <Planet
+                  name="Moon"
+                  role="Resume"
+                  radius={3.5} 
+                  orbitRadius={70} 
+                  orbitSpeed={0.095}
+                  color="#9ca3af"
+                  texturePattern="moon"
+                  onClick={() => onPlanetClick("resume")}
+                  hoverScale={1.35}
+                  onHoverChange={(h) => setHoveredPlanet(h ? "Moon" : null)}
+                  expansionFactor={expansionFactor}
+                />
+              </>
+            )}
+
+            {/* Background elements */}
+            {loaderProgress >= 70 && <AsteroidBelt opacity={expansionFactor} />}
+            {loaderProgress >= 40 && <SolarWind warp={isWarping} opacity={expansionFactor} />}
+            {loaderProgress >= 80 && <ShootingComet />}
+            {loaderProgress >= 75 && <CelestialCreator opacity={creatorOpacity} />}
+
+            {/* Sun Core */}
+            {isSunIgnitePhase && (
+              <group ref={sunGroupRef}>
+                <mesh 
+                  onClick={() => loaderProgress >= 90 && onPlanetClick("about")} 
+                  onPointerOver={handleSunPointerOver} 
+                  onPointerOut={handleSunPointerOut}
+                >
+                  <sphereGeometry args={[35, 64, 64]} />
+                  <shaderMaterial
+                    ref={sunMatRef}
+                    args={[SunShaderMaterial]}
+                    transparent
+                    blending={THREE.AdditiveBlending}
+                  />
+                </mesh>
+                
+                {/* Volumetric outer solar atmosphere glow */}
+                <mesh scale={1.12}>
+                  <sphereGeometry args={[35, 32, 32]} />
+                  <meshBasicMaterial
+                    color="#FF6A00"
+                    transparent
+                    opacity={0.25 * expansionFactor}
+                    blending={THREE.AdditiveBlending}
+                    side={THREE.BackSide}
+                  />
+                </mesh>
+
+                {/* Volumetric Sun Ray 1 */}
+                <mesh ref={sunRayRef1} position={[0, 0, 2]}>
+                  <planeGeometry args={[130, 130]} />
+                  <meshBasicMaterial
+                    map={sunRayTex}
+                    transparent
+                    opacity={expansionFactor}
+                    blending={THREE.AdditiveBlending}
+                    depthWrite={false}
+                  />
+                </mesh>
+
+                {/* Volumetric Sun Ray 2 */}
+                <mesh ref={sunRayRef2} position={[0, 0, -2]}>
+                  <planeGeometry args={[150, 150]} />
+                  <meshBasicMaterial
+                    map={sunRayTex}
+                    transparent
+                    opacity={0.8 * expansionFactor}
+                    blending={THREE.AdditiveBlending}
+                    depthWrite={false}
+                  />
+                </mesh>
+
+                {/* Sun Hover Detail Overlay */}
+                {sunHovered && expansionFactor >= 0.9 && (
+                  <Html distanceFactor={35} position={[0, 48, 0]}>
+                    <div className="bg-black/90 border border-amber-500 text-center text-white p-4 rounded shadow-[0_0_20px_rgba(245,158,11,0.4)] flex flex-col gap-1.5 w-52 pointer-events-none select-none tracking-widest font-mono z-50">
+                      <span className="text-amber-500 font-extrabold text-[9px] tracking-[0.2em]">// SOLAR_CORE</span>
+                      <h3 className="text-xs font-bold text-white uppercase tracking-[0.15em] mt-0.5">AMEY SAWANT</h3>
+                      <div className="w-full h-[1px] bg-amber-500/30 my-1" />
+                      <div className="text-[8px] text-neutral-300 flex flex-col gap-0.5 tracking-wider uppercase">
+                        <span>Developer</span>
+                        <span>AI Explorer</span>
+                        <span>Universe Creator</span>
+                      </div>
+                    </div>
+                  </Html>
+                )}
+              </group>
+            )}
+          </>
+        )}
+
+        <CameraDirector activeSection={activeSection} currentWorld={currentWorld} />
+        <ShaderTimeUpdater />
+      </Canvas>
+    </div>
   );
 }
