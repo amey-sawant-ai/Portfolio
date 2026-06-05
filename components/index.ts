@@ -14,6 +14,8 @@
 
 export { CinematicLoader } from "./CinematicLoader";
 export { StoryCanvas } from "./StoryCanvas";
+export { CosmicTerminal } from "./CosmicTerminal";
+export { CosmicChatbot } from "./CosmicChatbot";
 
 // Explorable Planet Worlds
 export { default as ProjectsWorld } from "./worlds/ProjectsWorld";

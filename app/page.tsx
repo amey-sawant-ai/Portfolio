@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
-import { Volume2, VolumeX, Maximize2, Radio, Activity, ArrowLeft } from "lucide-react";
-import { CinematicLoader } from "@/components";
+import { Volume2, VolumeX, Maximize2, Radio, Activity, ArrowLeft, Terminal, MessageSquare, Cpu } from "lucide-react";
+import { AnimatePresence } from "framer-motion";
+import { CinematicLoader, CosmicTerminal, CosmicChatbot } from "@/components";
 import { audio } from "@/lib/audio";
 
 // Dynamically import Three.js StoryCanvas to disable Next.js SSR
@@ -20,9 +21,30 @@ export default function Home() {
   const [mouseCoords, setMouseCoords] = useState({ ra: "0000", dec: "0000" });
   const [mounted, setMounted] = useState(false);
   const [narratorSubtitle, setNarratorSubtitle] = useState("");
+  const [isTerminalOpen, setIsTerminalOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [warpMode, setWarpMode] = useState("normal");
+  const [isDimensionTransition, setIsDimensionTransition] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+
+    // Suppress internal THREE.Clock deprecation warnings from React Three Fiber
+    const originalWarn = console.warn;
+    console.warn = (...args) => {
+      if (
+        args[0] &&
+        typeof args[0] === "string" &&
+        args[0].includes("THREE.Clock: This module has been deprecated")
+      ) {
+        return;
+      }
+      originalWarn(...args);
+    };
+
+    return () => {
+      console.warn = originalWarn;
+    };
   }, []);
 
   // Track active section to trigger deep space narrative subtitles & SpeechSynthesis
@@ -85,6 +107,22 @@ export default function Home() {
   const handleToggleMute = () => {
     const newMuted = audio.toggleMute();
     setIsMuted(newMuted);
+  };
+
+  const cycleWarpMode = () => {
+    audio.playWarpSound();
+    setIsDimensionTransition(true);
+
+    const modes = ["normal", "hologram", "synthwave"];
+    const nextIdx = (modes.indexOf(warpMode) + 1) % modes.length;
+
+    setTimeout(() => {
+      setWarpMode(modes[nextIdx]);
+    }, 400); // Trigger swap at warp peak
+
+    setTimeout(() => {
+      setIsDimensionTransition(false);
+    }, 1200); // Complete zoom
   };
 
   // Prevent SSR Hydration errors
@@ -166,14 +204,51 @@ export default function Home() {
           </span>
         </div>
 
-        {/* HUD: Bottom-Left Interactive Controls (Audio Toggle & Grid Readout) */}
-        <div className="fixed bottom-10 left-10 z-35 flex items-center gap-6 select-none pointer-events-auto">
+        {/* HUD: Bottom-Left Interactive Controls (Audio Toggle, Terminal, Chatbot & Grid Readout) */}
+        <div className="fixed bottom-10 left-10 z-35 flex items-center gap-4 select-none pointer-events-auto">
           {/* Audio toggle button */}
           <button
             onClick={handleToggleMute}
             className="p-2.5 rounded-full border border-white/10 hover:border-amber-500/40 text-neutral-400 hover:text-amber-400 bg-black/40 backdrop-blur transition-all cursor-pointer shadow-glow-hover"
+            title="Mute / Unmute"
           >
             {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+          </button>
+
+          {/* Terminal toggle button */}
+          <button
+            onClick={() => {
+              audio.playClickSound();
+              setIsTerminalOpen(!isTerminalOpen);
+              setIsChatOpen(false);
+            }}
+            className={`p-2.5 rounded-full border bg-black/40 backdrop-blur transition-all cursor-pointer shadow-glow-hover
+              ${isTerminalOpen 
+                ? "border-amber-500 text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.3)]" 
+                : "border-white/10 text-neutral-400 hover:border-amber-500/40 hover:text-amber-400"
+              }
+            `}
+            title="Toggle Command Terminal"
+          >
+            <Terminal className="w-4 h-4" />
+          </button>
+
+          {/* AI Chatbot toggle button */}
+          <button
+            onClick={() => {
+              audio.playClickSound();
+              setIsChatOpen(!isChatOpen);
+              setIsTerminalOpen(false);
+            }}
+            className={`p-2.5 rounded-full border bg-black/40 backdrop-blur transition-all cursor-pointer shadow-glow-hover
+              ${isChatOpen 
+                ? "border-cyan-500 text-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.3)]" 
+                : "border-white/10 text-neutral-400 hover:border-cyan-500/40 hover:text-cyan-400"
+              }
+            `}
+            title="Toggle AI Companion"
+          >
+            <MessageSquare className="w-4 h-4" />
           </button>
           
           <div className="flex flex-col gap-0.5 text-left font-mono">
@@ -189,6 +264,15 @@ export default function Home() {
 
         {/* HUD: Bottom-Right Controls (Navigation Helpers & Active Sector Back Button) */}
         <div className="fixed bottom-10 right-10 z-35 flex items-center gap-4 select-none pointer-events-auto">
+          <button
+            onClick={cycleWarpMode}
+            className="flex items-center gap-2 px-4 py-2 border border-white/10 hover:border-amber-500/40 text-neutral-400 hover:text-amber-400 bg-black/40 backdrop-blur transition-all cursor-pointer font-bold tracking-widest text-[9px] uppercase rounded shadow-glow-hover"
+            title="Cycle Warp Dimension"
+          >
+            <Cpu className="w-3.5 h-3.5 animate-pulse" />
+            <span>DIMENSION: {warpMode.toUpperCase()}</span>
+          </button>
+
           {activeSection !== "home" ? (
             <button
               onClick={handleBackToHome}
@@ -224,7 +308,32 @@ export default function Home() {
           activeSection={activeSection}
           onPlanetClick={handlePlanetClick}
           loaderProgress={loaderProgress}
+          warpMode={warpMode}
+          isDimensionTransition={isDimensionTransition}
         />
+
+        {/* 4. Interactive Command Line Terminal */}
+        <AnimatePresence>
+          {isTerminalOpen && (
+            <CosmicTerminal
+              onWarp={(sector) => {
+                setActiveSection(sector);
+              }}
+              onClose={() => setIsTerminalOpen(false)}
+              currentSection={activeSection}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* 5. Interactive A.S.T.R.A. AI Chatbot */}
+        <AnimatePresence>
+          {isChatOpen && (
+            <CosmicChatbot
+              onClose={() => setIsChatOpen(false)}
+              currentSection={activeSection}
+            />
+          )}
+        </AnimatePresence>
       </main>
 
       <style jsx global>{`

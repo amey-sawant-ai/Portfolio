@@ -21,26 +21,29 @@ export function CinematicLoader({ onComplete, onProgressChange }: CinematicLoade
     const duration = 4500;
     const intervalTime = 45;
     const increment = 100 / (duration / intervalTime);
-    
-    // Initial call
-    if (onProgressChange) onProgressChange(0);
 
     const interval = setInterval(() => {
       setProgress((prev) => {
         const next = prev + increment;
         const boundedNext = Math.min(next, 100);
-        if (onProgressChange) onProgressChange(boundedNext);
         if (next >= 100) {
           clearInterval(interval);
           setIsReady(true);
           return 100;
         }
-        return next;
+        return boundedNext;
       });
     }, intervalTime);
 
     return () => clearInterval(interval);
-  }, [onProgressChange]);
+  }, []);
+
+  // Safely propagate progress change to parent in a useEffect (post-render)
+  useEffect(() => {
+    if (onProgressChange) {
+      onProgressChange(progress);
+    }
+  }, [progress, onProgressChange]);
 
   // Update status messages as progress ticks up
   useEffect(() => {
