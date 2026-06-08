@@ -287,59 +287,59 @@ export default function ContactWorld({ onBack }: ContactWorldProps) {
       </points>
 
       {/* Holographic Interactive Contact Transmitter HUD */}
-      <Html center distanceFactor={34} position={[0, 6, 12]}>
-        <div className="w-[85vw] max-w-md bg-black/85 border border-cyan-500/40 p-6 md:p-8 rounded shadow-[0_0_30px_rgba(6,182,212,0.3)] flex flex-col gap-4 font-mono text-white relative backdrop-blur-xl">
-          <span className="absolute top-2 left-2 text-[7px] text-cyan-500/50 tracking-wider">COMMS_LINK_TRANSCEIVER // MUMB_SEC</span>
+      <Html center>
+        <div className="w-[94vw] md:w-[680px] bg-black/25 border border-cyan-500/40 p-9 md:p-12 rounded-xl shadow-[0_0_50px_rgba(6,182,212,0.4)] flex flex-col gap-6 font-mono text-white relative backdrop-blur-xl pointer-events-auto">
+          <span className="absolute top-3.5 left-3.5 text-[10px] text-cyan-500/50 tracking-wider">COMMS_LINK_TRANSCEIVER // MUMB_SEC</span>
           
-          <div className="border-b border-cyan-500/20 pb-3 mt-1 text-left">
-            <span className="text-[9px] text-cyan-400 font-extrabold tracking-widest block">// INITIATE BEACON</span>
-            <h3 className="text-sm font-bold text-white tracking-widest uppercase mt-0.5">TRANSMIT DATA PACKETS</h3>
+          <div className="border-b border-cyan-500/20 pb-4 mt-2.5 text-left">
+            <span className="text-[12px] text-cyan-400 font-extrabold tracking-widest block">// INITIATE BEACON</span>
+            <h3 className="text-lg md:text-xl font-bold text-white tracking-widest uppercase mt-0.5">TRANSMIT DATA PACKETS</h3>
           </div>
 
           {status === "success" ? (
-            <div className="border border-cyan-500/30 bg-cyan-950/20 p-5 rounded text-center text-xs space-y-4 py-8">
-              <Radio className="w-8 h-8 text-cyan-400 animate-ping mx-auto mb-2" />
-              <h4 className="font-bold text-white uppercase tracking-widest">// SIGNAL BEACON FIRED</h4>
-              <p className="text-neutral-400 text-[10px] leading-relaxed">Your data coordinates have been relayed across deep space to Amey's console.</p>
+            <div className="border border-cyan-500/30 bg-cyan-950/20 p-8 rounded text-center text-sm space-y-5 py-14">
+              <Radio className="w-12 h-12 text-cyan-400 animate-ping mx-auto mb-4.5" />
+              <h4 className="font-bold text-white uppercase tracking-widest text-base">// SIGNAL BEACON FIRED</h4>
+              <p className="text-neutral-400 text-[13px] leading-relaxed">Your data coordinates have been relayed across deep space to Amey's console.</p>
               <button
                 onClick={() => setStatus("idle")}
-                className="px-4 py-2 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/10 rounded transition-colors pointer-events-auto cursor-pointer"
+                className="px-6 py-3 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/10 rounded-md transition-colors pointer-events-auto cursor-pointer text-[11px]"
               >
                 [ TRANSMIT ANOTHER ]
               </button>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4 font-mono text-[10px] text-left pointer-events-auto">
+            <form onSubmit={handleSubmit} className="space-y-6 font-mono text-[14px] text-left pointer-events-auto">
               <div>
-                <label className="text-[8px] text-neutral-400 block mb-1 uppercase">// TRANSMITTER IDENTITY</label>
+                <label className="text-[11px] text-neutral-400 block mb-2 uppercase tracking-wider">// TRANSMITTER IDENTITY</label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
-                  className="w-full bg-white/5 border border-white/10 rounded px-3 py-2.5 text-white focus:outline-none focus:border-cyan-400 transition-colors disabled:opacity-50"
+                  className="w-full bg-white/5 border border-white/10 rounded-md px-5 py-4 text-white focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/30 transition-all disabled:opacity-50 text-sm"
                   placeholder="Enter name..."
                 />
               </div>
               <div>
-                <label className="text-[8px] text-neutral-400 block mb-1 uppercase">// RETURN WAVE FREQUENCY</label>
+                <label className="text-[11px] text-neutral-400 block mb-2 uppercase tracking-wider">// RETURN WAVE FREQUENCY</label>
                 <input
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   required
-                  className="w-full bg-white/5 border border-white/10 rounded px-3 py-2.5 text-white focus:outline-none focus:border-cyan-400 transition-colors disabled:opacity-50"
+                  className="w-full bg-white/5 border border-white/10 rounded-md px-5 py-4 text-white focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/30 transition-all disabled:opacity-50 text-sm"
                   placeholder="Enter email address..."
                 />
               </div>
               <div>
-                <label className="text-[8px] text-neutral-400 block mb-1 uppercase">// MESSAGE PAYLOAD</label>
+                <label className="text-[11px] text-neutral-400 block mb-2 uppercase tracking-wider">// MESSAGE PAYLOAD</label>
                 <textarea
-                  rows={3}
+                  rows={4}
                   value={formData.message}
                   onChange={(e) => setFormData({ ...formData, message: e.target.value })}
                   required
-                  className="w-full bg-white/5 border border-white/10 rounded px-3 py-2.5 text-white focus:outline-none focus:border-cyan-400 transition-colors resize-none disabled:opacity-50"
+                  className="w-full bg-white/5 border border-white/10 rounded-md px-5 py-4 text-white focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/30 transition-all resize-none disabled:opacity-50 text-sm"
                   placeholder="Write message content..."
                 />
               </div>
@@ -347,22 +347,22 @@ export default function ContactWorld({ onBack }: ContactWorldProps) {
               <button
                 type="submit"
                 disabled={status === "sending"}
-                className="w-full flex items-center justify-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white py-3 rounded font-bold tracking-widest uppercase transition-all shadow-[0_0_12px_rgba(6,182,212,0.25)] cursor-pointer disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white py-4.5 rounded-md font-bold tracking-widest uppercase transition-all shadow-[0_0_15px_rgba(6,182,212,0.3)] cursor-pointer disabled:opacity-50 text-[12px]"
               >
-                <Send className="w-3.5 h-3.5 animate-pulse" />
+                <Send className="w-5 h-5 animate-pulse" />
                 <span>{status === "sending" ? "BROADCASTING CODES..." : "TRANSMIT FREQUENCY"}</span>
               </button>
             </form>
           )}
 
           {/* Social Relays */}
-          <div className="border-t border-white/5 pt-4 flex justify-center gap-6 pointer-events-auto">
+          <div className="border-t border-white/5 pt-5 flex justify-center gap-8 pointer-events-auto">
             <a
               href={SITE_CONFIG.social.github}
               onPointerOver={handlePointerOver}
               target="_blank"
               rel="noreferrer"
-              className="text-neutral-400 hover:text-cyan-400 transition-colors font-mono text-[9px] flex items-center gap-1"
+              className="text-neutral-400 hover:text-cyan-400 transition-colors font-mono text-[13px] flex items-center gap-2"
             >
               <span>GITHUB</span>
             </a>
@@ -371,16 +371,16 @@ export default function ContactWorld({ onBack }: ContactWorldProps) {
               onPointerOver={handlePointerOver}
               target="_blank"
               rel="noreferrer"
-              className="text-neutral-400 hover:text-cyan-400 transition-colors font-mono text-[9px] flex items-center gap-1"
+              className="text-neutral-400 hover:text-cyan-400 transition-colors font-mono text-[13px] flex items-center gap-2"
             >
               <span>LINKEDIN</span>
             </a>
             <a
               href={`mailto:${SITE_CONFIG.social.email}`}
               onPointerOver={handlePointerOver}
-              className="text-neutral-400 hover:text-cyan-400 transition-colors font-mono text-[9px] flex items-center gap-1"
+              className="text-neutral-400 hover:text-cyan-400 transition-colors font-mono text-[13px] flex items-center gap-2"
             >
-              <Mail className="w-3.5 h-3.5" />
+              <Mail className="w-5 h-5" />
               <span>EMAIL</span>
             </a>
           </div>

@@ -23,6 +23,24 @@ export function generatePersonSchema() {
       SITE_CONFIG.social.linkedin,
     ],
     description: SITE_CONFIG.description,
+    address: {
+      "@type": "PostalAddress",
+      addressLocality: "Mumbai",
+      addressRegion: "Maharashtra",
+      addressCountry: "India",
+    },
+    knowsAbout: [
+      "Full Stack Web Development",
+      "Creative Technology",
+      "Three.js",
+      "WebGL",
+      "Next.js",
+      "React",
+      "TypeScript",
+      "AI Integration",
+      "Node.js",
+      "Interactive 3D Graphics",
+    ],
   };
 }
 

@@ -6,6 +6,8 @@ import { Volume2, VolumeX, Maximize2, Radio, Activity, ArrowLeft, Terminal, Mess
 import { AnimatePresence } from "framer-motion";
 import { CinematicLoader, CosmicTerminal, CosmicChatbot } from "@/components";
 import { audio } from "@/lib/audio";
+import { isWebGLAvailable } from "@/lib/webgl-detect";
+import { WebGLFallback } from "@/components/WebGLFallback";
 
 // Dynamically import Three.js StoryCanvas to disable Next.js SSR
 const StoryCanvas = dynamic(
@@ -25,9 +27,11 @@ export default function Home() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [warpMode, setWarpMode] = useState("normal");
   const [isDimensionTransition, setIsDimensionTransition] = useState(false);
+  const [webglSupported, setWebglSupported] = useState(true);
 
   useEffect(() => {
     setMounted(true);
+    setWebglSupported(isWebGLAvailable());
 
     // Suppress internal THREE.Clock deprecation warnings from React Three Fiber
     const originalWarn = console.warn;
@@ -170,6 +174,59 @@ export default function Home() {
           ${isLoading ? "opacity-0 pointer-events-none" : "opacity-100 pointer-events-auto"}
         `}
       >
+        {/* Hidden semantic content for search engine optimization (SEO) and screen readers */}
+        <section className="sr-only">
+          <h1>Amey Sawant — Full Stack Developer &amp; Creative Technologist</h1>
+          <p>
+            Welcome to the professional portfolio of Amey Sawant, a Software Engineer, Full Stack Developer, and Creative Technologist based in Mumbai, India. I specialize in crafting high-performance web applications, interactive 3D graphics (Three.js/WebGL), and integrated AI agent workflows.
+          </p>
+          <nav>
+            <h2>Navigation Orbitals</h2>
+            <ul>
+              <li><a href="#about">About the Creator</a></li>
+              <li><a href="#projects">3D Projects Dock</a></li>
+              <li><a href="#skills">Interactive Skills Ring</a></li>
+              <li><a href="#experience">Professional Mission Logs</a></li>
+              <li><a href="#resume">Cybernetic Resume Console</a></li>
+              <li><a href="#contact">Signal Transmitter Beacon</a></li>
+            </ul>
+          </nav>
+          
+          <article id="about-info">
+            <h2>About Amey Sawant</h2>
+            <p>
+              Born in Mumbai, India. Early curiosity for what happens behind the screen evolved into a passion for software design and digital physics. I build high-performance web applications and agentic AI systems that fuse elegant design with robust engineering.
+            </p>
+          </article>
+          
+          <article id="projects-info">
+            <h2>Featured Projects</h2>
+            <ul>
+              <li>
+                <h3>Astraeus AI</h3>
+                <p>Autonomous multi-agent orchestration framework featuring localized vector reasoning swarms cooperating on complex analytical pipelines.</p>
+              </li>
+              <li>
+                <h3>Chronos 3D Mapper</h3>
+                <p>Interactive space telemetry tracker plotting near-Earth orbital coordinates using GPU-accelerated vertex shaders.</p>
+              </li>
+              <li>
+                <h3>Helios Data Matrix</h3>
+                <p>Sub-millisecond data ingestion gateway handling distributed telemetry pipelines built with Rust, gRPC, and Redis.</p>
+              </li>
+            </ul>
+          </article>
+
+          <article id="skills-info">
+            <h2>Core Skills &amp; Capabilities</h2>
+            <ul>
+              <li>Frontend &amp; UI: React, Next.js, TypeScript, Tailwind CSS, Three.js, React Three Fiber, GLSL Shaders, Framer Motion</li>
+              <li>Backend &amp; Cloud: Node.js, Express, Python, FastAPI, Rust, gRPC, Protobuf, PostgreSQL, MongoDB, Redis, Google Cloud Platform, AWS</li>
+              <li>Agentic AI &amp; Dev-Ops: LangGraph, LangChain, LLM Fine-Tuning, Docker, Kubernetes, CI/CD, Prometheus, Grafana</li>
+            </ul>
+          </article>
+        </section>
+
         {/* Ambient background vignette overlay */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_40%,rgba(0,0,0,0.65)_100%)] z-20 pointer-events-none" />
 
@@ -303,14 +360,21 @@ export default function Home() {
           </div>
         )}
 
-        {/* 3. Three.js / React Three Fiber Scene Component */}
-        <StoryCanvas
-          activeSection={activeSection}
-          onPlanetClick={handlePlanetClick}
-          loaderProgress={loaderProgress}
-          warpMode={warpMode}
-          isDimensionTransition={isDimensionTransition}
-        />
+        {/* 3. Three.js / React Three Fiber Scene Component (or CSS fallback) */}
+        {webglSupported ? (
+          <StoryCanvas
+            activeSection={activeSection}
+            onPlanetClick={handlePlanetClick}
+            loaderProgress={loaderProgress}
+            warpMode={warpMode}
+            isDimensionTransition={isDimensionTransition}
+          />
+        ) : (
+          <WebGLFallback
+            activeSection={activeSection}
+            onPlanetClick={handlePlanetClick}
+          />
+        )}
 
         {/* 4. Interactive Command Line Terminal */}
         <AnimatePresence>

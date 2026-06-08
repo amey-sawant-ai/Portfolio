@@ -60,15 +60,14 @@ export const metadata: Metadata = {
     siteName: `${SITE_CONFIG.name} — Portfolio`,
     title: `${SITE_CONFIG.name} — ${SITE_CONFIG.title}`,
     description: SITE_CONFIG.description,
-    // Future: Add OG image
-    // images: [
-    //   {
-    //     url: "/og-image.png",
-    //     width: 1200,
-    //     height: 630,
-    //     alt: `${SITE_CONFIG.name} Portfolio`,
-    //   },
-    // ],
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: `${SITE_CONFIG.name} Portfolio — Full Stack Developer & Creative Technologist`,
+      },
+    ],
   },
 
   twitter: {
@@ -76,8 +75,7 @@ export const metadata: Metadata = {
     title: `${SITE_CONFIG.name} — ${SITE_CONFIG.title}`,
     description: SITE_CONFIG.description,
     creator: SITE_CONFIG.social.twitter,
-    // Future: Add Twitter image
-    // images: ["/og-image.png"],
+    images: ["/og-image.png"],
   },
 
   alternates: {

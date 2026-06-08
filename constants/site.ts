@@ -14,7 +14,7 @@ export const SITE_CONFIG = {
 
   /** Site description for SEO and Open Graph */
   description:
-    "Futuristic portfolio of Amey Sawant showcasing AI, web development, 3D experiences and creative engineering projects.",
+    "Explore the interactive 3D portfolio of Amey Sawant, a Full Stack Developer & Creative Technologist showcasing AI integrations, advanced WebGL/Three.js visualizers, and creative software engineering solutions.",
 
   /** Production domain (without protocol) */
   domain: "ameysawant.in",
@@ -51,17 +51,20 @@ export const SITE_CONFIG = {
   /** SEO keywords for discoverability */
   keywords: [
     "Amey Sawant",
-    "portfolio",
-    "full stack developer",
-    "web developer",
-    "creative technologist",
-    "React",
-    "Next.js",
-    "Three.js",
-    "3D web",
-    "interactive portfolio",
-    "frontend engineer",
-    "TypeScript",
+    "Amey Pradip Sawant",
+    "Amey Prakash Sawant",
+    "Full Stack Developer",
+    "Creative Technologist",
+    "Software Engineer",
+    "Three.js Portfolio",
+    "Next.js Developer",
+    "AI Agent Engineer",
+    "React Developer",
+    "TypeScript Portfolio",
+    "WebGL Developer",
+    "Creative Software Engineering",
+    "Web Audio API",
+    "Interactive 3D Portfolio",
   ],
 } as const;
 

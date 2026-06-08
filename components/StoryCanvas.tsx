@@ -2,7 +2,7 @@
 
 import React, { useRef, useMemo, useState, useEffect, Suspense } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Points, PointMaterial, Html, useGLTF } from "@react-three/drei";
+import { Points, PointMaterial, Html, useGLTF, useTexture } from "@react-three/drei";
 import * as THREE from "three";
 import { gsap } from "gsap";
 import { audio } from "@/lib/audio";
@@ -35,179 +35,20 @@ export const PLANET_SPECS = {
   Moon: { radius: 3.5, orbitRadius: 70, orbitSpeed: 0.095, phase: 5.0, color: "#9ca3af" }
 };
 
-// Generates organic, high-fidelity planet textures procedurally in memory using radial gradients
-function createProceduralTexture(type: string): THREE.CanvasTexture {
-  const canvas = document.createElement("canvas");
-  canvas.width = 512;
-  canvas.height = 256;
-  const ctx = canvas.getContext("2d")!;
+// Maps planet type identifiers to their texture file paths in /public/planets/
+const TEXTURE_PATHS: Record<string, string> = {
+  earth: "/planets/earth/2k_earth_daymap.jpg",
+  mars: "/planets/mars/2k_mars.jpg",
+  saturn: "/planets/saturn/2k_saturn.jpg",
+  neptune: "/planets/neptune/2k_neptune.jpg",
+  moon: "/planets/moon/2k_moon.jpg",
+};
 
-  if (type === "earth") {
-    // Deep Ocean Base
-    ctx.fillStyle = "#0c2340";
-    ctx.fillRect(0, 0, 512, 256);
-
-    // Draw organic blended landmasses
-    for (let i = 0; i < 45; i++) {
-      const cx = Math.random() * 512;
-      const cy = 35 + Math.random() * 186;
-      const r = Math.random() * 85 + 25;
-      
-      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-      grad.addColorStop(0, "#14532d"); // Forest green land core
-      grad.addColorStop(0.45, "#166534"); // Standard land green
-      grad.addColorStop(0.75, "#0d9488"); // Coastal teal transition
-      grad.addColorStop(1, "rgba(12, 35, 64, 0.0)"); // Soft ocean blend
-      
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Add polar ice caps with blurred margins
-    const northCap = ctx.createLinearGradient(0, 0, 0, 45);
-    northCap.addColorStop(0, "#ffffff");
-    northCap.addColorStop(0.7, "rgba(255, 255, 255, 0.9)");
-    northCap.addColorStop(1, "rgba(255, 255, 255, 0.0)");
-    ctx.fillStyle = northCap;
-    ctx.fillRect(0, 0, 512, 45);
-
-    const southCap = ctx.createLinearGradient(0, 211, 0, 256);
-    southCap.addColorStop(0, "rgba(255, 255, 255, 0.0)");
-    southCap.addColorStop(0.3, "rgba(255, 255, 255, 0.9)");
-    southCap.addColorStop(1, "#ffffff");
-    ctx.fillStyle = southCap;
-    ctx.fillRect(0, 211, 512, 45);
-  } 
-  else if (type === "saturn") {
-    // Banded gas giant base
-    const grad = ctx.createLinearGradient(0, 0, 0, 256);
-    grad.addColorStop(0, "#271203");
-    grad.addColorStop(0.15, "#451a03");
-    grad.addColorStop(0.32, "#78350f");
-    grad.addColorStop(0.48, "#d97706");
-    grad.addColorStop(0.55, "#b45309");
-    grad.addColorStop(0.72, "#78350f");
-    grad.addColorStop(0.88, "#451a03");
-    grad.addColorStop(1.0, "#271203");
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 512, 256);
-
-    // Render micro atmospheric bands with low opacity
-    for (let i = 0; i < 22; i++) {
-      const y = Math.random() * 256;
-      const h = Math.random() * 10 + 2;
-      ctx.fillStyle = "rgba(251, 191, 36, 0.07)";
-      ctx.fillRect(0, y, 512, h);
-    }
-  } 
-  else if (type === "mars") {
-    // Deep iron-oxide rust base
-    ctx.fillStyle = "#7c2d12";
-    ctx.fillRect(0, 0, 512, 256);
-
-    // Layered canyons, sands, and dust storms
-    for (let i = 0; i < 40; i++) {
-      const cx = Math.random() * 512;
-      const cy = Math.random() * 256;
-      const r = Math.random() * 95 + 20;
-
-      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-      grad.addColorStop(0, "#451a03"); // Dark canyon trenches
-      grad.addColorStop(0.35, "#9a3412"); // Desert oxidation
-      grad.addColorStop(0.7, "#7c2d12"); // Ambient rust
-      grad.addColorStop(1, "rgba(124, 45, 18, 0.0)"); // Soft margin
-      
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // White ice poles
-    const capGrad = ctx.createRadialGradient(256, 0, 0, 256, 0, 30);
-    capGrad.addColorStop(0, "#ffffff");
-    capGrad.addColorStop(0.5, "#fed7aa");
-    capGrad.addColorStop(1, "rgba(124, 45, 18, 0.0)");
-    ctx.fillStyle = capGrad;
-    ctx.beginPath();
-    ctx.arc(256, 0, 30, 0, Math.PI * 2);
-    ctx.fill();
-  } 
-  else if (type === "neptune") {
-    // Gaseous deep blue base
-    const grad = ctx.createLinearGradient(0, 0, 0, 256);
-    grad.addColorStop(0, "#082f49");
-    grad.addColorStop(0.35, "#0284c7");
-    grad.addColorStop(0.65, "#0369a1");
-    grad.addColorStop(1.0, "#082f49");
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 512, 256);
-
-    // Swirling methane storm spots
-    for (let i = 0; i < 15; i++) {
-      const cx = Math.random() * 512;
-      const cy = Math.random() * 256;
-      const r = Math.random() * 55 + 15;
-
-      const stormGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-      stormGrad.addColorStop(0, "rgba(34, 211, 238, 0.22)"); // Cyan storms
-      stormGrad.addColorStop(0.5, "rgba(3, 105, 161, 0.08)");
-      stormGrad.addColorStop(1, "rgba(8, 47, 73, 0.0)");
-
-      ctx.fillStyle = stormGrad;
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-  else if (type === "moon") {
-    // Solid grey regolith base
-    ctx.fillStyle = "#374151";
-    ctx.fillRect(0, 0, 512, 256);
-
-    // Draw soft lava seas (Maria)
-    for (let i = 0; i < 10; i++) {
-      const cx = Math.random() * 512;
-      const cy = Math.random() * 256;
-      const r = Math.random() * 120 + 40;
-
-      const seaGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-      seaGrad.addColorStop(0, "#1f2937"); // Lava sea core
-      seaGrad.addColorStop(0.6, "#374151"); // Sea margins
-      seaGrad.addColorStop(1, "rgba(55, 65, 81, 0.0)");
-
-      ctx.fillStyle = seaGrad;
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // High-impact craters with ejecta rays
-    for (let i = 0; i < 30; i++) {
-      const cx = Math.random() * 512;
-      const cy = Math.random() * 256;
-      const r = Math.random() * 14 + 3;
-
-      const craterGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-      craterGrad.addColorStop(0, "#ffffff"); // Crater peak/center
-      craterGrad.addColorStop(0.18, "#9ca3af"); // Crater rim
-      craterGrad.addColorStop(0.4, "#4b5563"); // Outer floor
-      craterGrad.addColorStop(1, "rgba(55, 65, 81, 0.0)"); // Ejecta halo
-
-      ctx.fillStyle = craterGrad;
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.ClampToEdgeWrapping;
-  return texture;
-}
+// Additional texture paths for enhanced rendering
+const EARTH_CLOUDS_PATH = "/planets/earth/2k_earth_clouds.png";
+const SATURN_RING_PATH = "/planets/saturn/2k_saturn_ring.png";
+const SUN_TEXTURE_PATH = "/planets/sun/2k_sun.jpg";
+const STARFIELD_TEXTURE_PATH = "/planets/sun/StarsMap_2500x1250.jpg";
 
 // Generates Saturn's rings with divisions
 function createSaturnRingTexture(): THREE.CanvasTexture {
@@ -221,7 +62,7 @@ function createSaturnRingTexture(): THREE.CanvasTexture {
   grad.addColorStop(0, "rgba(251, 191, 36, 0.0)");
   grad.addColorStop(0.15, "rgba(245, 158, 11, 0.55)");
   grad.addColorStop(0.44, "rgba(245, 158, 11, 0.7)");
-  grad.addColorStop(0.48, "rgba(245, 158, 11, 0.02)"); 
+  grad.addColorStop(0.48, "rgba(245, 158, 11, 0.02)");
   grad.addColorStop(0.56, "rgba(251, 191, 36, 0.65)");
   grad.addColorStop(1.0, "rgba(251, 191, 36, 0.0)");
 
@@ -414,7 +255,7 @@ function Meteor({ progress }: { progress: number }) {
         <sphereGeometry args={[3.2, 16, 16]} />
         <meshBasicMaterial color="#ffffff" />
       </mesh>
-      
+
       {/* Meteor outer glow */}
       <mesh scale={1.8}>
         <sphereGeometry args={[3.2, 8, 8]} />
@@ -516,7 +357,7 @@ function WarpLines({ active }: { active: boolean }) {
 // Towering Creator silhouette mesh group behind solar system
 function CelestialCreator({ opacity = 1.0 }: { opacity?: number }) {
   const groupRef = useRef<THREE.Group | null>(null);
-  
+
   const material = useMemo(() => {
     return new THREE.ShaderMaterial({
       ...CreatorShaderMaterial,
@@ -539,8 +380,8 @@ function CelestialCreator({ opacity = 1.0 }: { opacity?: number }) {
     const colors = [];
     const count = 2800;
 
-    const cHead = new THREE.Color("#fff8e7"); 
-    const cArms = new THREE.Color("#f97316"); 
+    const cHead = new THREE.Color("#fff8e7");
+    const cArms = new THREE.Color("#f97316");
 
     for (let i = 0; i < count; i++) {
       const u = Math.random();
@@ -548,10 +389,10 @@ function CelestialCreator({ opacity = 1.0 }: { opacity?: number }) {
       const theta = u * 2.0 * Math.PI;
       const phi = Math.acos(2.0 * v - 1.0);
       const r = 25 + Math.random() * 6; // Halo radius
-      
+
       coords.push(
         r * Math.sin(phi) * Math.cos(theta),
-        r * Math.cos(phi) + 110, 
+        r * Math.cos(phi) + 110,
         r * Math.sin(phi) * Math.sin(theta) - 130
       );
 
@@ -643,9 +484,9 @@ function CosmicNebula() {
 
   const clouds = useMemo(() => {
     return [
-      { scale: 360, speed: 0.01, z: -190, rot: [0, 0, 0], tex: createNebulaTexture("#7C3AED") }, 
-      { scale: 320, speed: -0.007, z: -160, rot: [0, 0, 1.2], tex: createNebulaTexture("#F97316") }, 
-      { scale: 280, speed: 0.005, z: -130, rot: [0.8, 0, 0.4], tex: createNebulaTexture("#06B6D4") } 
+      { scale: 360, speed: 0.01, z: -190, rot: [0, 0, 0], tex: createNebulaTexture("#7C3AED") },
+      { scale: 320, speed: -0.007, z: -160, rot: [0, 0, 1.2], tex: createNebulaTexture("#F97316") },
+      { scale: 280, speed: 0.005, z: -130, rot: [0.8, 0, 0.4], tex: createNebulaTexture("#06B6D4") }
     ];
   }, []);
 
@@ -678,30 +519,30 @@ function CosmicNebula() {
 // Rotating Spiral Galaxy in the background
 function SpiralGalaxy() {
   const pointsRef = useRef<THREE.Points | null>(null);
-  
+
   const galaxyData = useMemo(() => {
     const coords = [];
     const colors = [];
     const count = 2200;
     const arms = 2;
-    const cCore = new THREE.Color("#fbcfe8"); 
-    const cArm = new THREE.Color("#8b5cf6"); 
-    
+    const cCore = new THREE.Color("#fbcfe8");
+    const cArm = new THREE.Color("#8b5cf6");
+
     for (let i = 0; i < count; i++) {
       const armIdx = i % arms;
       const distance = Math.pow(Math.random(), 2.0) * 160 + 10;
       const angle = (distance * 0.05) + (armIdx * Math.PI) + (Math.random() - 0.5) * 0.25;
-      
+
       const x = Math.cos(angle) * distance;
       const z = Math.sin(angle) * distance;
       const y = (Math.random() - 0.5) * 10 * (1.0 - distance / 160);
-      
-      coords.push(x + 150, y - 80, z - 170); 
-      
+
+      coords.push(x + 150, y - 80, z - 170);
+
       const color = cCore.clone().lerp(cArm, distance / 160);
       colors.push(color.r, color.g, color.b);
     }
-    
+
     return {
       positions: new Float32Array(coords),
       colors: new Float32Array(colors)
@@ -786,8 +627,24 @@ function Starfield({ warp, warpMode = "normal" }: { warp: boolean; warpMode?: st
   const farColor = warpMode === "hologram" ? "#00FFCC" : warpMode === "synthwave" ? "#FF00FF" : "#e0e7ff";
   const nearColor = warpMode === "hologram" ? "#a7f3d0" : warpMode === "synthwave" ? "#fbcfe8" : "#ffedd5";
 
+  // Load the real starfield texture for a photorealistic background sphere
+  const starfieldTexture = useTexture(STARFIELD_TEXTURE_PATH);
+
   return (
     <group>
+      {/* Photorealistic deep space background sphere */}
+      <mesh>
+        <sphereGeometry args={[1200, 64, 32]} />
+        <meshBasicMaterial
+          map={starfieldTexture}
+          side={THREE.BackSide}
+          transparent
+          opacity={0.7}
+          depthWrite={false}
+        />
+      </mesh>
+
+      {/* Particle star layers for depth and warp effects */}
       <Points ref={farRef} positions={farStars} stride={3}>
         <PointMaterial
           size={0.45}
@@ -825,7 +682,7 @@ function OrbitRing({ radius, color = "#FF9F1C", active, opacity = 1.0, warpMode 
     const ringColor = warpMode === "hologram" ? "#00FFCC" : warpMode === "synthwave" ? "#FF00FF" : color;
     const material = new THREE.LineBasicMaterial({
       color: new THREE.Color(ringColor),
-      opacity: (active ? 0.55 : 0.14) * opacity, 
+      opacity: (active ? 0.55 : 0.14) * opacity,
       transparent: true
     });
     return new THREE.Line(geometry, material);
@@ -844,7 +701,7 @@ function AsteroidBelt({ opacity = 1.0 }: { opacity?: number }) {
     for (let i = 0; i < count; i++) {
       const angle = (i / count) * Math.PI * 2 + Math.random() * 0.08;
       const dist = 188 + Math.random() * 22;
-      const y = (Math.random() - 0.5) * 6; 
+      const y = (Math.random() - 0.5) * 6;
       coords.push(
         Math.cos(angle) * dist,
         y,
@@ -856,7 +713,7 @@ function AsteroidBelt({ opacity = 1.0 }: { opacity?: number }) {
 
   useFrame(({ clock }) => {
     if (beltRef.current) {
-      beltRef.current.rotation.y = clock.getElapsedTime() * 0.007; 
+      beltRef.current.rotation.y = clock.getElapsedTime() * 0.007;
     }
   });
 
@@ -864,7 +721,7 @@ function AsteroidBelt({ opacity = 1.0 }: { opacity?: number }) {
     <Points ref={beltRef} positions={beltData} stride={3}>
       <PointMaterial
         size={0.65}
-        color="#a16207" 
+        color="#a16207"
         transparent
         opacity={0.35 * opacity}
         sizeAttenuation
@@ -886,7 +743,7 @@ function SolarWind({ warp, opacity = 1.0 }: { warp: boolean; opacity?: number })
         pos: new THREE.Vector3(0, 0, 0),
         dir: new THREE.Vector3(
           Math.random() - 0.5,
-          (Math.random() - 0.5) * 0.18, 
+          (Math.random() - 0.5) * 0.18,
           Math.random() - 0.5
         ).normalize(),
         speed: 0.65 + Math.random() * 0.75,
@@ -900,24 +757,24 @@ function SolarWind({ warp, opacity = 1.0 }: { warp: boolean; opacity?: number })
 
   useFrame(() => {
     if (!pointsRef.current) return;
-    
+
     particles.forEach((p, idx) => {
       // Speeds up solar radiation wind during warping
       const currentSpeed = p.speed * (warp ? 5.5 : 1.0);
       p.pos.addScaledVector(p.dir, currentSpeed);
       p.age += warp ? 4.0 : 1.0;
-      
+
       if (p.pos.length() > 270 || p.age > 110) {
         p.pos.set(0, 0, 0);
         p.age = 0;
         p.speed = 0.65 + Math.random() * 0.75;
       }
-      
+
       posArray[idx * 3] = p.pos.x;
       posArray[idx * 3 + 1] = p.pos.y;
       posArray[idx * 3 + 2] = p.pos.z;
     });
-    
+
     pointsRef.current.geometry.attributes.position.needsUpdate = true;
   });
 
@@ -942,7 +799,7 @@ function SolarWind({ warp, opacity = 1.0 }: { warp: boolean; opacity?: number })
 // Dynamic comets
 function ShootingComet() {
   const cometRef = useRef<THREE.Mesh | null>(null);
-  
+
   const trajectory = useMemo(() => {
     return {
       start: new THREE.Vector3(-350, 120, -180),
@@ -954,11 +811,11 @@ function ShootingComet() {
 
   useFrame(() => {
     if (!cometRef.current) return;
-    
+
     const direction = new THREE.Vector3().subVectors(trajectory.end, trajectory.start).normalize();
     trajectory.current.addScaledVector(direction, trajectory.speed);
     cometRef.current.position.copy(trajectory.current);
-    
+
     if (trajectory.current.x > trajectory.end.x) {
       trajectory.current.copy(trajectory.start);
       trajectory.start.set(-350, 80 + Math.random() * 100, -200 - Math.random() * 100);
@@ -999,13 +856,13 @@ function PlanetGlow({ radius, color, opacity = 1.0 }: { radius: number; color: s
 // Orbiting particles around each planet
 function PlanetParticles({ radius, color }: { radius: number; color: string }) {
   const pointsRef = useRef<THREE.Points | null>(null);
-  
+
   const particles = useMemo(() => {
     const coords = [];
     const count = 50;
     for (let i = 0; i < count; i++) {
       const angle = (i / count) * Math.PI * 2 + Math.random() * 0.15;
-      const r = radius * (1.35 + Math.random() * 0.35); 
+      const r = radius * (1.35 + Math.random() * 0.35);
       const y = (Math.random() - 0.5) * radius * 0.25;
       coords.push(Math.cos(angle) * r, y, Math.sin(angle) * r);
     }
@@ -1044,7 +901,7 @@ interface PlanetProps {
   orbitRadius: number;
   orbitSpeed: number;
   color: string;
-  texturePattern?: string; 
+  texturePattern?: string;
   onClick: () => void;
   hoverScale?: number;
   onHoverChange: (hovered: boolean) => void;
@@ -1057,45 +914,29 @@ function Planet({ name, role, radius, orbitRadius, orbitSpeed, color, texturePat
   const cloudsRef = useRef<THREE.Mesh | null>(null);
   const [hovered, setHovered] = useState(false);
 
-  const planetTexture = useMemo(() => createProceduralTexture(texturePattern || ""), [texturePattern]);
-  const cloudsTexture = useMemo(() => createCloudsTexture(), []);
-  const saturnRingTex = useMemo(() => createSaturnRingTexture(), []);
+  // Load real texture from public/planets/ directory
+  const texturePath = TEXTURE_PATHS[texturePattern || ""] || TEXTURE_PATHS.earth;
+  const planetTexture = useTexture(texturePath);
 
-  // Generates procedural cloud texture
-  function createCloudsTexture(): THREE.CanvasTexture {
-    const canvas = document.createElement("canvas");
-    canvas.width = 512;
-    canvas.height = 256;
-    const ctx = canvas.getContext("2d")!;
-    ctx.clearRect(0, 0, 512, 256);
-    ctx.fillStyle = "rgba(255, 255, 255, 0.65)";
-    for (let i = 0; i < 30; i++) {
-      const cx = Math.random() * 512;
-      const cy = 20 + Math.random() * 216;
-      const r = Math.random() * 40 + 15;
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.wrapS = THREE.RepeatWrapping;
-    texture.wrapT = THREE.ClampToEdgeWrapping;
-    return texture;
-  }
+  // Load cloud texture for Earth/Neptune
+  const cloudsTexture = useTexture(EARTH_CLOUDS_PATH);
+
+  // Load Saturn ring texture (or fallback to procedural)
+  const saturnRingTex = useMemo(() => createSaturnRingTexture(), []);
 
   useFrame(({ clock }) => {
     if (!planetRef.current) return;
     const time = clock.getElapsedTime();
-    
+
     const spec = (PLANET_SPECS as any)[name];
     const phase = spec ? spec.phase : 0.0;
-    
+
     // Position scales dynamically with system birth expansion
     const currentRadius = orbitRadius * expansionFactor;
     const theta = phase + time * orbitSpeed;
     const x = Math.cos(theta) * currentRadius;
     const z = Math.sin(theta) * currentRadius;
-    
+
     planetRef.current.position.set(x, 0, z);
     planetRef.current.rotation.y += hovered ? 0.03 : 0.007;
 
@@ -1139,8 +980,9 @@ function Planet({ name, role, radius, orbitRadius, orbitSpeed, color, texturePat
             map={planetTexture}
             roughness={0.65}
             metalness={0.15}
-            emissive={new THREE.Color(color)}
-            emissiveIntensity={hovered ? 0.12 : 0.01}
+            emissive={new THREE.Color("#ffffff")}
+            emissiveMap={planetTexture}
+            emissiveIntensity={hovered ? 0.35 : 0.18}
           />
         ) : (
           <meshBasicMaterial
@@ -1189,21 +1031,20 @@ function Planet({ name, role, radius, orbitRadius, orbitSpeed, color, texturePat
           </mesh>
         )}
 
-        {/* Volumetric glow */}
-        <PlanetGlow radius={radius} color={color} opacity={expansionFactor} />
+        {/* Volumetric glow (removed to keep textures clear) */}
 
         {/* Stardust particles */}
         <PlanetParticles radius={radius} color={color} />
 
         {/* 3D Telemetry Hover Card */}
         {hovered && expansionFactor >= 0.9 && (
-          <Html distanceFactor={32} position={[0, radius * 1.9, 0]}>
-            <div className="bg-black/90 border border-amber-500/40 text-[9px] font-mono text-white p-3 rounded shadow-[0_0_15px_rgba(245,158,11,0.25)] flex flex-col gap-1.5 w-44 pointer-events-none select-none tracking-widest whitespace-nowrap z-50">
+          <Html distanceFactor={300} position={[0, radius * 1.9, 0]}>
+            <div className="bg-black/90 border border-amber-500/40 text-[11px] font-mono text-white p-4 rounded shadow-[0_0_20px_rgba(245,158,11,0.25)] flex flex-col gap-2 w-56 pointer-events-none select-none tracking-widest whitespace-nowrap z-50">
               <span className="text-amber-500 font-extrabold">// {name.toUpperCase()}_SECTOR</span>
-              <span className="text-[10px] text-white font-bold tracking-widest uppercase">{role}</span>
-              <span className="text-[7px] text-neutral-400">RAD: {radius} // DIST: {orbitRadius}</span>
+              <span className="text-[13px] text-white font-bold tracking-widest uppercase">{role}</span>
+              <span className="text-[9.5px] text-neutral-400">RAD: {radius} // DIST: {orbitRadius}</span>
               <div className="w-full h-[1px] bg-white/10 my-0.5" />
-              <span className="text-[7.5px] text-neutral-300 animate-pulse">[ CHOOSE_DESTINATION ]</span>
+              <span className="text-[10px] text-neutral-300 animate-pulse">[ CHOOSE_DESTINATION ]</span>
             </div>
           </Html>
         )}
@@ -1226,14 +1067,14 @@ function CameraDirector({ activeSection, currentWorld }: { activeSection: string
 
   useFrame(({ clock }) => {
     const elapsed = clock.getElapsedTime();
-    
+
     // 1. Render World Internal Frame
     if (currentWorld !== "home") {
       if (currentWorld !== "experience") {
         let targetPos = new THREE.Vector3(0, 20, 85);
         if (currentWorld === "skills") targetPos.set(0, 45, 110);
         if (currentWorld === "about") targetPos.set(0, 5, 80);
-        
+
         camera.position.lerp(targetPos, 0.1);
         camera.lookAt(new THREE.Vector3(0, currentWorld === "about" ? 5 : 12, 0));
       }
@@ -1245,7 +1086,7 @@ function CameraDirector({ activeSection, currentWorld }: { activeSection: string
     if (transition.active) {
       const duration = 1200;
       const factor = Math.min((Date.now() - transition.tStart) / duration, 1.0);
-      
+
       if (transition.targetSection === "home") {
         // Return back to standard overview
         const targetPos = new THREE.Vector3(0, 70, 450);
@@ -1255,15 +1096,15 @@ function CameraDirector({ activeSection, currentWorld }: { activeSection: string
       } else {
         // Zooming in towards target planet coordinates
         let targetPos = new THREE.Vector3(0, 0, 0);
-        
+
         if (transition.targetSection === "about") {
           targetPos.set(0, 0, 45); // Sun core
         } else {
           const spec = (PLANET_SPECS as any)[
             transition.targetSection === "projects" ? "Earth" :
-            transition.targetSection === "skills" ? "Saturn" :
-            transition.targetSection === "experience" ? "Mars" :
-            transition.targetSection === "contact" ? "Neptune" : "Moon"
+              transition.targetSection === "skills" ? "Saturn" :
+                transition.targetSection === "experience" ? "Mars" :
+                  transition.targetSection === "contact" ? "Neptune" : "Moon"
           ];
           if (spec) {
             const theta = spec.phase + elapsed * spec.orbitSpeed;
@@ -1274,7 +1115,7 @@ function CameraDirector({ activeSection, currentWorld }: { activeSection: string
           }
         }
         camera.position.lerp(targetPos, 0.08);
-        
+
         if (transition.targetSection !== "about") {
           camera.lookAt(targetPos);
         } else {
@@ -1314,6 +1155,7 @@ interface SunModelProps {
 function SunModel({ onClick, onPointerOver, onPointerOut, expansionFactor, warpMode = "normal" }: SunModelProps) {
   const { scene } = useGLTF("/models/sun.glb");
   const clonedScene = useMemo(() => scene.clone(), [scene]);
+  const sunTexture = useTexture(SUN_TEXTURE_PATH);
 
   useEffect(() => {
     clonedScene.traverse((child) => {
@@ -1321,20 +1163,26 @@ function SunModel({ onClick, onPointerOver, onPointerOut, expansionFactor, warpM
         if (child.material) {
           const mat = child.material as THREE.MeshStandardMaterial;
           if (warpMode === "normal") {
+            mat.map = sunTexture;
             mat.emissive = new THREE.Color("#FF7800");
-            mat.emissiveIntensity = 2.5;
+            mat.emissiveMap = sunTexture;
+            mat.emissiveIntensity = 2.0;
             mat.roughness = 0.4;
             mat.metalness = 0.2;
             mat.wireframe = false;
+            mat.needsUpdate = true;
           } else {
+            mat.map = null;
+            mat.emissiveMap = null;
             mat.wireframe = true;
             mat.emissive = new THREE.Color(warpMode === "hologram" ? "#00FFCC" : "#FF00FF");
             mat.emissiveIntensity = 3.5;
+            mat.needsUpdate = true;
           }
         }
       }
     });
-  }, [clonedScene, warpMode]);
+  }, [clonedScene, warpMode, sunTexture]);
 
   const localRef = useRef<THREE.Group | null>(null);
   useFrame(({ clock }) => {
@@ -1393,7 +1241,7 @@ export function StoryCanvas({ activeSection, onPlanetClick, loaderProgress = 100
   const isMeteorPhase = loaderProgress < 25;
   const isExplosionPhase = loaderProgress >= 25 && loaderProgress < 30;
   const isSunIgnitePhase = loaderProgress >= 25;
-  
+
   const expansionFactor = useMemo(() => {
     if (loaderProgress < 50) return 0;
     return Math.min((loaderProgress - 50) / 25, 1.0);
@@ -1410,21 +1258,21 @@ export function StoryCanvas({ activeSection, onPlanetClick, loaderProgress = 100
   const ShaderTimeUpdater = () => {
     useFrame(({ clock }) => {
       const t = clock.getElapsedTime();
-      
+
       if (sunMatRef.current && isSunIgnitePhase) {
         sunMatRef.current.uniforms.time.value = t;
-        
+
         // Sun breathing animation scale & pulse
-        const igniteScale = loaderProgress < 50 
-          ? (loaderProgress - 25) / 25 
+        const igniteScale = loaderProgress < 50
+          ? (loaderProgress - 25) / 25
           : 1.0;
-        
+
         const glowPulse = (1.0 + Math.sin(t * 1.8) * 0.15) * igniteScale;
         sunMatRef.current.uniforms.glowColor.value.set(
           new THREE.Color("#FF8C00").clone().multiplyScalar(glowPulse)
         );
       }
-      
+
       if (sunRayRef1.current) sunRayRef1.current.rotation.z = t * (isWarping ? 0.25 : 0.035);
       if (sunRayRef2.current) sunRayRef2.current.rotation.z = -t * (isWarping ? 0.15 : 0.02);
 
@@ -1498,17 +1346,17 @@ export function StoryCanvas({ activeSection, onPlanetClick, loaderProgress = 100
             {expansionFactor > 0 && (
               <>
                 {/* Orbit path rings */}
-                <OrbitRing radius={110} color="#3B82F6" active={hoveredPlanet === "Earth"} opacity={expansionFactor} warpMode={warpMode} /> 
-                <OrbitRing radius={160} color="#DC2626" active={hoveredPlanet === "Mars"} opacity={expansionFactor} warpMode={warpMode} /> 
-                <OrbitRing radius={220} color="#D97706" active={hoveredPlanet === "Saturn"} opacity={expansionFactor} warpMode={warpMode} /> 
-                <OrbitRing radius={290} color="#0891B2" active={hoveredPlanet === "Neptune"} opacity={expansionFactor} warpMode={warpMode} /> 
-                <OrbitRing radius={70} color="#9ca3af" active={hoveredPlanet === "Moon"} opacity={expansionFactor} warpMode={warpMode} /> 
+                <OrbitRing radius={110} color="#3B82F6" active={hoveredPlanet === "Earth"} opacity={expansionFactor} warpMode={warpMode} />
+                <OrbitRing radius={160} color="#DC2626" active={hoveredPlanet === "Mars"} opacity={expansionFactor} warpMode={warpMode} />
+                <OrbitRing radius={220} color="#D97706" active={hoveredPlanet === "Saturn"} opacity={expansionFactor} warpMode={warpMode} />
+                <OrbitRing radius={290} color="#0891B2" active={hoveredPlanet === "Neptune"} opacity={expansionFactor} warpMode={warpMode} />
+                <OrbitRing radius={70} color="#9ca3af" active={hoveredPlanet === "Moon"} opacity={expansionFactor} warpMode={warpMode} />
 
                 {/* Earth (Projects) */}
                 <Planet
                   name="Earth"
                   role="Projects"
-                  radius={10.5} 
+                  radius={10.5}
                   orbitRadius={110}
                   orbitSpeed={0.065}
                   color="#3B82F6"
@@ -1523,7 +1371,7 @@ export function StoryCanvas({ activeSection, onPlanetClick, loaderProgress = 100
                 <Planet
                   name="Mars"
                   role="Experience"
-                  radius={7.7} 
+                  radius={7.7}
                   orbitRadius={160}
                   orbitSpeed={0.045}
                   color="#DC2626"
@@ -1538,7 +1386,7 @@ export function StoryCanvas({ activeSection, onPlanetClick, loaderProgress = 100
                 <Planet
                   name="Saturn"
                   role="Skills"
-                  radius={16.8} 
+                  radius={16.8}
                   orbitRadius={220}
                   orbitSpeed={0.03}
                   color="#F59E0B"
@@ -1553,7 +1401,7 @@ export function StoryCanvas({ activeSection, onPlanetClick, loaderProgress = 100
                 <Planet
                   name="Neptune"
                   role="Contact"
-                  radius={14.0} 
+                  radius={14.0}
                   orbitRadius={290}
                   orbitSpeed={0.02}
                   color="#06B6D4"
@@ -1568,8 +1416,8 @@ export function StoryCanvas({ activeSection, onPlanetClick, loaderProgress = 100
                 <Planet
                   name="Moon"
                   role="Resume"
-                  radius={3.5} 
-                  orbitRadius={70} 
+                  radius={3.5}
+                  orbitRadius={70}
                   orbitSpeed={0.095}
                   color="#9ca3af"
                   texturePattern="moon"
@@ -1605,7 +1453,7 @@ export function StoryCanvas({ activeSection, onPlanetClick, loaderProgress = 100
                     warpMode={warpMode}
                   />
                 </Suspense>
-                
+
                 {/* Volumetric outer solar atmosphere glow */}
                 <mesh scale={1.12}>
                   <sphereGeometry args={[35, 32, 32]} />
@@ -1670,3 +1518,9 @@ export function StoryCanvas({ activeSection, onPlanetClick, loaderProgress = 100
 }
 
 useGLTF.preload("/models/sun.glb");
+
+// Preload all planet & environment textures
+useTexture.preload(SUN_TEXTURE_PATH);
+useTexture.preload(STARFIELD_TEXTURE_PATH);
+useTexture.preload(EARTH_CLOUDS_PATH);
+Object.values(TEXTURE_PATHS).forEach((path) => useTexture.preload(path));

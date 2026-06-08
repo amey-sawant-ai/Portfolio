@@ -16,6 +16,7 @@ export { CinematicLoader } from "./CinematicLoader";
 export { StoryCanvas } from "./StoryCanvas";
 export { CosmicTerminal } from "./CosmicTerminal";
 export { CosmicChatbot } from "./CosmicChatbot";
+export { WebGLFallback } from "./WebGLFallback";
 
 // Explorable Planet Worlds
 export { default as ProjectsWorld } from "./worlds/ProjectsWorld";
@@ -24,4 +25,5 @@ export { default as ExperienceWorld } from "./worlds/ExperienceWorld";
 export { default as ContactWorld } from "./worlds/ContactWorld";
 export { default as ResumeWorld } from "./worlds/ResumeWorld";
 export { default as CreatorWorld } from "./worlds/CreatorWorld";
+export { SectionOverlays } from "./SectionOverlays";
 
