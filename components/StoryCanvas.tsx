@@ -2,7 +2,7 @@
 
 import React, { useRef, useMemo, useState, useEffect, Suspense } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Points, PointMaterial, Html, useGLTF, useTexture } from "@react-three/drei";
+import { Points, PointMaterial, Html, useTexture } from "@react-three/drei";
 import * as THREE from "three";
 import { gsap } from "gsap";
 import { audio } from "@/lib/audio";
@@ -28,24 +28,35 @@ interface StoryCanvasProps {
 // -------------------------------------------------------------
 
 export const PLANET_SPECS = {
-  Earth: { radius: 10.5, orbitRadius: 110, orbitSpeed: 0.065, phase: 0.0, color: "#3B82F6" },
-  Mars: { radius: 7.7, orbitRadius: 160, orbitSpeed: 0.045, phase: 1.0, color: "#DC2626" },
-  Saturn: { radius: 16.8, orbitRadius: 220, orbitSpeed: 0.03, phase: 2.5, color: "#F59E0B" },
-  Neptune: { radius: 14.0, orbitRadius: 290, orbitSpeed: 0.02, phase: 4.0, color: "#06B6D4" },
+  Mercury: { radius: 4.8, orbitRadius: 55, orbitSpeed: 0.095, phase: 1.2, color: "#9E9E9E" },
+  Venus: { radius: 9.5, orbitRadius: 85, orbitSpeed: 0.075, phase: 2.8, color: "#E6C280" },
+  Earth: { radius: 10.5, orbitRadius: 115, orbitSpeed: 0.065, phase: 0.0, color: "#3B82F6" },
+  Mars: { radius: 7.7, orbitRadius: 150, orbitSpeed: 0.05, phase: 1.8, color: "#DC2626" },
+  Jupiter: { radius: 22.0, orbitRadius: 225, orbitSpeed: 0.035, phase: 3.2, color: "#D4A373" },
+  Saturn: { radius: 16.8, orbitRadius: 295, orbitSpeed: 0.025, phase: 2.2, color: "#F59E0B" },
+  Uranus: { radius: 13.5, orbitRadius: 360, orbitSpeed: 0.018, phase: 0.5, color: "#A0E0E0" },
+  Neptune: { radius: 14.0, orbitRadius: 425, orbitSpeed: 0.012, phase: 4.5, color: "#06B6D4" },
   Moon: { radius: 3.5, orbitRadius: 70, orbitSpeed: 0.095, phase: 5.0, color: "#9ca3af" }
 };
 
 // Maps planet type identifiers to their texture file paths in /public/planets/
 const TEXTURE_PATHS: Record<string, string> = {
+  mercury: "/planets/mercury/2k_mercury.jpg",
+  venus: "/planets/venus/2k_venus.jpg",
   earth: "/planets/earth/2k_earth_daymap.jpg",
   mars: "/planets/mars/2k_mars.jpg",
+  jupiter: "/planets/jupiter/2k_jupiter.jpg",
   saturn: "/planets/saturn/2k_saturn.jpg",
+  uranus: "/planets/uranus/2k_uranus.jpg",
   neptune: "/planets/neptune/2k_neptune.jpg",
   moon: "/planets/moon/2k_moon.jpg",
+  sun: "/planets/sun/2k_sun.jpg",
 };
 
 // Additional texture paths for enhanced rendering
 const EARTH_CLOUDS_PATH = "/planets/earth/2k_earth_clouds.png";
+const EARTH_NORMAL_PATH = "/planets/earth/2k_earth_normal.jpg";
+const EARTH_ROUGHNESS_PATH = "/planets/earth/2k_earth_roughness.jpg";
 const SATURN_RING_PATH = "/planets/saturn/2k_saturn_ring.png";
 const SUN_TEXTURE_PATH = "/planets/sun/2k_sun.jpg";
 const STARFIELD_TEXTURE_PATH = "/planets/sun/StarsMap_2500x1250.jpg";
@@ -184,34 +195,7 @@ const SunShaderMaterial = {
   `
 };
 
-const CreatorShaderMaterial = {
-  uniforms: {
-    glowColor: { value: new THREE.Color("#FF8C00") },
-    opacity: { value: 1.0 }
-  },
-  vertexShader: `
-    varying vec3 vNormal;
-    varying vec3 vViewPosition;
-    void main() {
-      vNormal = normalize(normalMatrix * normal);
-      vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-      vViewPosition = -mvPosition.xyz;
-      gl_Position = projectionMatrix * mvPosition;
-    }
-  `,
-  fragmentShader: `
-    uniform vec3 glowColor;
-    uniform float opacity;
-    varying vec3 vNormal;
-    varying vec3 vViewPosition;
-    void main() {
-      vec3 normal = normalize(vNormal);
-      vec3 viewDir = normalize(vViewPosition);
-      float intensity = pow(1.0 - clamp(dot(normal, viewDir), 0.0, 1.0), 3.0);
-      gl_FragColor = vec4(glowColor * intensity * 1.8, intensity * 0.95 * opacity);
-    }
-  `
-};
+
 
 // -------------------------------------------------------------
 // 3. SUB-COMPONENTS
@@ -354,129 +338,7 @@ function WarpLines({ active }: { active: boolean }) {
   );
 }
 
-// Towering Creator silhouette mesh group behind solar system
-function CelestialCreator({ opacity = 1.0 }: { opacity?: number }) {
-  const groupRef = useRef<THREE.Group | null>(null);
 
-  const material = useMemo(() => {
-    return new THREE.ShaderMaterial({
-      ...CreatorShaderMaterial,
-      uniforms: {
-        glowColor: { value: new THREE.Color("#FF8C00") },
-        opacity: { value: opacity }
-      },
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    });
-  }, []);
-
-  useEffect(() => {
-    material.uniforms.opacity.value = opacity;
-  }, [opacity, material]);
-
-  const stardustData = useMemo(() => {
-    const coords = [];
-    const colors = [];
-    const count = 2800;
-
-    const cHead = new THREE.Color("#fff8e7");
-    const cArms = new THREE.Color("#f97316");
-
-    for (let i = 0; i < count; i++) {
-      const u = Math.random();
-      const v = Math.random();
-      const theta = u * 2.0 * Math.PI;
-      const phi = Math.acos(2.0 * v - 1.0);
-      const r = 25 + Math.random() * 6; // Halo radius
-
-      coords.push(
-        r * Math.sin(phi) * Math.cos(theta),
-        r * Math.cos(phi) + 110,
-        r * Math.sin(phi) * Math.sin(theta) - 130
-      );
-
-      const mixC = cHead.clone().lerp(cArms, Math.random());
-      colors.push(mixC.r, mixC.g, mixC.b);
-    }
-
-    return {
-      positions: new Float32Array(coords),
-      colors: new Float32Array(colors)
-    };
-  }, []);
-
-  useFrame(({ clock }) => {
-    if (!groupRef.current) return;
-    const time = clock.getElapsedTime();
-    groupRef.current.position.y = Math.sin(time * 0.8) * 1.8;
-  });
-
-  return (
-    <group ref={groupRef}>
-      {/* 3D Head Silhouette */}
-      <mesh position={[0, 110, -135]}>
-        <sphereGeometry args={[26, 32, 32]} />
-        <primitive object={material} attach="material" />
-      </mesh>
-
-      {/* Torso Cylinder */}
-      <mesh position={[0, 50, -135]}>
-        <cylinderGeometry args={[20, 28, 90, 32]} />
-        <primitive object={material} attach="material" />
-      </mesh>
-
-      {/* Shoulders */}
-      <mesh position={[-28, 85, -135]}>
-        <sphereGeometry args={[14, 16, 16]} />
-        <primitive object={material} attach="material" />
-      </mesh>
-      <mesh position={[28, 85, -135]}>
-        <sphereGeometry args={[14, 16, 16]} />
-        <primitive object={material} attach="material" />
-      </mesh>
-
-      {/* Left Arm bending forward */}
-      <mesh position={[-90, 65, -80]} rotation={[0.4, 0.4, -0.6]}>
-        <cylinderGeometry args={[8, 6, 75, 16]} />
-        <primitive object={material} attach="material" />
-      </mesh>
-
-      {/* Right Arm bending forward */}
-      <mesh position={[90, 65, -80]} rotation={[0.4, -0.4, 0.6]}>
-        <cylinderGeometry args={[8, 6, 75, 16]} />
-        <primitive object={material} attach="material" />
-      </mesh>
-
-      {/* Hands representing creation control anchors */}
-      <mesh position={[-140, 50, 20]}>
-        <sphereGeometry args={[9, 16, 16]} />
-        <primitive object={material} attach="material" />
-      </mesh>
-      <mesh position={[140, 50, 20]}>
-        <sphereGeometry args={[9, 16, 16]} />
-        <primitive object={material} attach="material" />
-      </mesh>
-
-      {/* Stardust Halo Particles */}
-      <points>
-        <bufferGeometry>
-          <bufferAttribute attach="attributes-position" args={[stardustData.positions, 3]} />
-          <bufferAttribute attach="attributes-color" args={[stardustData.colors, 3]} />
-        </bufferGeometry>
-        <pointsMaterial
-          size={0.7}
-          vertexColors
-          transparent
-          opacity={0.4 * opacity}
-          sizeAttenuation
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-        />
-      </points>
-    </group>
-  );
-}
 
 // Background Deep Space Nebula Clouds
 function CosmicNebula() {
@@ -672,13 +534,15 @@ function Starfield({ warp, warpMode = "normal" }: { warp: boolean; warpMode?: st
 
 // Glowing Orbit Line Indicators
 function OrbitRing({ radius, color = "#FF9F1C", active, opacity = 1.0, warpMode = "normal" }: { radius: number; color?: string; active?: boolean; opacity?: number; warpMode?: string }) {
+  const lineRef = useRef<THREE.Line | null>(null);
+
   const ring = useMemo(() => {
-    const points = [];
+    const pts = [];
     for (let i = 0; i <= 120; i++) {
       const angle = (i / 120) * Math.PI * 2;
-      points.push(new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius));
+      pts.push(new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius));
     }
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const geometry = new THREE.BufferGeometry().setFromPoints(pts);
     const ringColor = warpMode === "hologram" ? "#00FFCC" : warpMode === "synthwave" ? "#FF00FF" : color;
     const material = new THREE.LineBasicMaterial({
       color: new THREE.Color(ringColor),
@@ -686,9 +550,19 @@ function OrbitRing({ radius, color = "#FF9F1C", active, opacity = 1.0, warpMode 
       transparent: true
     });
     return new THREE.Line(geometry, material);
-  }, [radius, color, active, opacity, warpMode]);
+  }, [radius, color, warpMode]);
 
-  return <primitive object={ring} />;
+  useFrame(() => {
+    if (lineRef.current) {
+      const mat = lineRef.current.material as THREE.LineBasicMaterial;
+      if (mat) {
+        const targetOpacity = (active ? 0.55 : 0.14) * opacity;
+        mat.opacity = THREE.MathUtils.lerp(mat.opacity, targetOpacity, 0.08);
+      }
+    }
+  });
+
+  return <primitive ref={lineRef} object={ring} />;
 }
 
 // Detailed Asteroid Belt
@@ -907,12 +781,28 @@ interface PlanetProps {
   onHoverChange: (hovered: boolean) => void;
   expansionFactor?: number;
   warpMode?: string;
+  isInteractive?: boolean;
 }
 
-function Planet({ name, role, radius, orbitRadius, orbitSpeed, color, texturePattern, onClick, hoverScale = 1.25, onHoverChange, expansionFactor = 1.0, warpMode = "normal" }: PlanetProps) {
+function Planet({ name, role, radius, orbitRadius, orbitSpeed, color, texturePattern, onClick, hoverScale = 1.25, onHoverChange, expansionFactor = 1.0, warpMode = "normal", isInteractive = true }: PlanetProps) {
   const planetRef = useRef<THREE.Mesh | null>(null);
   const cloudsRef = useRef<THREE.Mesh | null>(null);
+  const ringGeoRef = useRef<THREE.RingGeometry | null>(null);
   const [hovered, setHovered] = useState(false);
+
+  // Smooth animation refs
+  const scaleVal = useRef(1.0);
+  const emissiveVal = useRef(0.18);
+  const [cardVisible, setCardVisible] = useState(false);
+
+  useEffect(() => {
+    if (hovered) {
+      const timer = setTimeout(() => setCardVisible(true), 20);
+      return () => clearTimeout(timer);
+    } else {
+      setCardVisible(false);
+    }
+  }, [hovered]);
 
   // Load real texture from public/planets/ directory
   const texturePath = TEXTURE_PATHS[texturePattern || ""] || TEXTURE_PATHS.earth;
@@ -921,8 +811,66 @@ function Planet({ name, role, radius, orbitRadius, orbitSpeed, color, texturePat
   // Load cloud texture for Earth/Neptune
   const cloudsTexture = useTexture(EARTH_CLOUDS_PATH);
 
-  // Load Saturn ring texture (or fallback to procedural)
-  const saturnRingTex = useMemo(() => createSaturnRingTexture(), []);
+  // Load Earth normal and roughness maps
+  const earthNormalMap = useTexture(EARTH_NORMAL_PATH);
+  const earthRoughnessMap = useTexture(EARTH_ROUGHNESS_PATH);
+
+  // Load high-resolution Saturn ring texture
+  const saturnRingTex = useTexture(SATURN_RING_PATH);
+
+  useEffect(() => {
+    if (planetTexture) {
+      planetTexture.colorSpace = THREE.SRGBColorSpace;
+      planetTexture.needsUpdate = true;
+    }
+  }, [planetTexture]);
+
+  useEffect(() => {
+    if (earthNormalMap) {
+      earthNormalMap.colorSpace = THREE.NoColorSpace;
+      earthNormalMap.needsUpdate = true;
+    }
+    if (earthRoughnessMap) {
+      earthRoughnessMap.colorSpace = THREE.NoColorSpace;
+      earthRoughnessMap.needsUpdate = true;
+    }
+  }, [earthNormalMap, earthRoughnessMap]);
+
+  useEffect(() => {
+    if (saturnRingTex) {
+      saturnRingTex.colorSpace = THREE.SRGBColorSpace;
+      saturnRingTex.wrapS = THREE.RepeatWrapping;
+      saturnRingTex.wrapT = THREE.RepeatWrapping;
+      saturnRingTex.needsUpdate = true;
+    }
+  }, [saturnRingTex]);
+
+  // Rewrite UV coordinates for Saturn's ringGeometry to map it radially
+  useEffect(() => {
+    if (ringGeoRef.current && texturePattern === "saturn") {
+      const geometry = ringGeoRef.current;
+      const pos = geometry.attributes.position;
+      const uv = geometry.attributes.uv;
+
+      const v3 = new THREE.Vector3();
+      for (let i = 0; i < pos.count; i++) {
+        v3.fromBufferAttribute(pos, i);
+        
+        let angle = Math.atan2(v3.y, v3.x);
+        if (angle < 0) angle += Math.PI * 2;
+        const u = angle / (Math.PI * 2);
+
+        const dist = v3.length();
+        const innerRadius = radius * 1.5;
+        const outerRadius = radius * 2.3;
+        const v = (dist - innerRadius) / (outerRadius - innerRadius);
+
+        // Map radial distance to X of texture, and angle to Y of texture
+        uv.setXY(i, v, u);
+      }
+      uv.needsUpdate = true;
+    }
+  }, [radius, texturePattern, saturnRingTex]);
 
   useFrame(({ clock }) => {
     if (!planetRef.current) return;
@@ -938,7 +886,22 @@ function Planet({ name, role, radius, orbitRadius, orbitSpeed, color, texturePat
     const z = Math.sin(theta) * currentRadius;
 
     planetRef.current.position.set(x, 0, z);
+
+    // Eased scale transition
+    const targetScale = hovered ? hoverScale : 1.0;
+    scaleVal.current = THREE.MathUtils.lerp(scaleVal.current, targetScale, 0.08);
+    const expansionScale = Math.min(expansionFactor * 2.0, 1.0);
+    planetRef.current.scale.setScalar(scaleVal.current * expansionScale);
+
     planetRef.current.rotation.y += hovered ? 0.03 : 0.007;
+
+    // Eased emissive glow transition
+    const mat = planetRef.current.material as THREE.MeshStandardMaterial;
+    if (mat && warpMode === "normal") {
+      const targetEmissive = hovered ? 0.35 : 0.18;
+      emissiveVal.current = THREE.MathUtils.lerp(emissiveVal.current, targetEmissive, 0.08);
+      mat.emissiveIntensity = emissiveVal.current;
+    }
 
     if (cloudsRef.current) {
       cloudsRef.current.rotation.y += hovered ? 0.045 : 0.011;
@@ -950,19 +913,25 @@ function Planet({ name, role, radius, orbitRadius, orbitSpeed, color, texturePat
     e.stopPropagation();
     setHovered(true);
     onHoverChange(true);
-    document.body.style.cursor = "pointer";
-    audio.playHoverSound();
+    if (isInteractive) {
+      document.body.style.cursor = "pointer";
+      audio.playHoverSound();
+    }
   };
 
   const handlePointerOut = () => {
     setHovered(false);
     onHoverChange(false);
-    document.body.style.cursor = "default";
+    if (isInteractive) {
+      document.body.style.cursor = "default";
+    }
   };
 
   const handleMeshClick = (e: any) => {
     e.stopPropagation();
-    onClick();
+    if (isInteractive) {
+      onClick();
+    }
   };
 
   return (
@@ -972,17 +941,20 @@ function Planet({ name, role, radius, orbitRadius, orbitSpeed, color, texturePat
         onClick={handleMeshClick}
         onPointerOver={handlePointerOver}
         onPointerOut={handlePointerOut}
-        scale={(hovered ? hoverScale : 1.0) * Math.min(expansionFactor * 2.0, 1.0)}
+        castShadow
+        receiveShadow
       >
         <sphereGeometry args={[radius, 32, 32]} />
         {warpMode === "normal" ? (
           <meshStandardMaterial
             map={planetTexture}
-            roughness={0.65}
-            metalness={0.15}
+            normalMap={texturePattern === "earth" ? earthNormalMap : undefined}
+            normalScale={texturePattern === "earth" ? new THREE.Vector2(1.2, 1.2) : undefined}
+            roughnessMap={texturePattern === "earth" ? earthRoughnessMap : undefined}
+            roughness={texturePattern === "earth" ? 1.0 : 0.65}
+            metalness={texturePattern === "earth" ? 0.05 : 0.15}
             emissive={new THREE.Color("#ffffff")}
             emissiveMap={planetTexture}
-            emissiveIntensity={hovered ? 0.35 : 0.18}
           />
         ) : (
           <meshBasicMaterial
@@ -995,7 +967,7 @@ function Planet({ name, role, radius, orbitRadius, orbitSpeed, color, texturePat
 
         {/* Dynamic Atmosphere clouds */}
         {warpMode === "normal" && (texturePattern === "earth" || texturePattern === "neptune") && (
-          <mesh ref={cloudsRef} scale={1.015}>
+          <mesh ref={cloudsRef} scale={1.015} castShadow receiveShadow>
             <sphereGeometry args={[radius, 32, 32]} />
             <meshStandardMaterial
               alphaMap={cloudsTexture}
@@ -1010,13 +982,13 @@ function Planet({ name, role, radius, orbitRadius, orbitSpeed, color, texturePat
 
         {/* Saturn Rings */}
         {texturePattern === "saturn" && (
-          <mesh rotation={[Math.PI / 2.3, 0, 0]}>
-            <ringGeometry args={[radius * 1.5, radius * 2.3, 64]} />
+          <mesh rotation={[Math.PI / 2.3, 0, 0]} castShadow receiveShadow>
+            <ringGeometry ref={ringGeoRef} args={[radius * 1.5, radius * 2.3, 64]} />
             {warpMode === "normal" ? (
               <meshStandardMaterial
                 map={saturnRingTex}
                 transparent
-                opacity={0.8}
+                opacity={0.85}
                 side={THREE.DoubleSide}
               />
             ) : (
@@ -1031,6 +1003,29 @@ function Planet({ name, role, radius, orbitRadius, orbitSpeed, color, texturePat
           </mesh>
         )}
 
+        {/* Uranus Rings */}
+        {texturePattern === "uranus" && (
+          <mesh rotation={[Math.PI / 2.5, 0.2, 0.1]} castShadow receiveShadow>
+            <ringGeometry args={[radius * 1.3, radius * 1.8, 64]} />
+            {warpMode === "normal" ? (
+              <meshStandardMaterial
+                color="#8bebeb"
+                transparent
+                opacity={0.35}
+                side={THREE.DoubleSide}
+              />
+            ) : (
+              <meshBasicMaterial
+                color={warpMode === "hologram" ? "#00FFCC" : "#FF00FF"}
+                wireframe={true}
+                transparent
+                opacity={0.2}
+                side={THREE.DoubleSide}
+              />
+            )}
+          </mesh>
+        )}
+
         {/* Volumetric glow (removed to keep textures clear) */}
 
         {/* Stardust particles */}
@@ -1039,12 +1034,16 @@ function Planet({ name, role, radius, orbitRadius, orbitSpeed, color, texturePat
         {/* 3D Telemetry Hover Card */}
         {hovered && expansionFactor >= 0.9 && (
           <Html distanceFactor={300} position={[0, radius * 1.9, 0]}>
-            <div className="bg-black/90 border border-amber-500/40 text-[11px] font-mono text-white p-4 rounded shadow-[0_0_20px_rgba(245,158,11,0.25)] flex flex-col gap-2 w-56 pointer-events-none select-none tracking-widest whitespace-nowrap z-50">
+            <div className={`bg-black/90 border border-amber-500/40 text-[11px] font-mono text-white p-4 rounded shadow-[0_0_20px_rgba(245,158,11,0.25)] flex flex-col gap-2 w-56 pointer-events-none select-none tracking-widest whitespace-nowrap z-50 transition-all duration-300 ease-out transform ${
+              cardVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
+            }`}>
               <span className="text-amber-500 font-extrabold">// {name.toUpperCase()}_SECTOR</span>
               <span className="text-[13px] text-white font-bold tracking-widest uppercase">{role}</span>
               <span className="text-[9.5px] text-neutral-400">RAD: {radius} // DIST: {orbitRadius}</span>
               <div className="w-full h-[1px] bg-white/10 my-0.5" />
-              <span className="text-[10px] text-neutral-300 animate-pulse">[ CHOOSE_DESTINATION ]</span>
+              <span className="text-[10px] text-neutral-300 animate-pulse">
+                {isInteractive ? "[ CHOOSE_DESTINATION ]" : "[ ACCESS_RESTRICTED ]"}
+              </span>
             </div>
           </Html>
         )}
@@ -1089,7 +1088,7 @@ function CameraDirector({ activeSection, currentWorld }: { activeSection: string
 
       if (transition.targetSection === "home") {
         // Return back to standard overview
-        const targetPos = new THREE.Vector3(0, 70, 450);
+        const targetPos = new THREE.Vector3(0, 70, 650);
         camera.position.lerp(targetPos, 0.08);
         camera.lookAt(new THREE.Vector3(0, 0, 0));
         if (factor >= 1.0) transition.active = false;
@@ -1130,7 +1129,7 @@ function CameraDirector({ activeSection, currentWorld }: { activeSection: string
       const overviewPos = new THREE.Vector3(
         Math.sin(t * 0.15) * 12,
         70 + Math.cos(t * 0.12) * 8,
-        450
+        650
       );
       camera.position.lerp(overviewPos, 0.05);
       camera.lookAt(new THREE.Vector3(0, 0, 0));
@@ -1153,36 +1152,14 @@ interface SunModelProps {
 }
 
 function SunModel({ onClick, onPointerOver, onPointerOut, expansionFactor, warpMode = "normal" }: SunModelProps) {
-  const { scene } = useGLTF("/models/sun.glb");
-  const clonedScene = useMemo(() => scene.clone(), [scene]);
   const sunTexture = useTexture(SUN_TEXTURE_PATH);
 
   useEffect(() => {
-    clonedScene.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        if (child.material) {
-          const mat = child.material as THREE.MeshStandardMaterial;
-          if (warpMode === "normal") {
-            mat.map = sunTexture;
-            mat.emissive = new THREE.Color("#FF7800");
-            mat.emissiveMap = sunTexture;
-            mat.emissiveIntensity = 2.0;
-            mat.roughness = 0.4;
-            mat.metalness = 0.2;
-            mat.wireframe = false;
-            mat.needsUpdate = true;
-          } else {
-            mat.map = null;
-            mat.emissiveMap = null;
-            mat.wireframe = true;
-            mat.emissive = new THREE.Color(warpMode === "hologram" ? "#00FFCC" : "#FF00FF");
-            mat.emissiveIntensity = 3.5;
-            mat.needsUpdate = true;
-          }
-        }
-      }
-    });
-  }, [clonedScene, warpMode, sunTexture]);
+    if (sunTexture) {
+      sunTexture.colorSpace = THREE.SRGBColorSpace;
+      sunTexture.needsUpdate = true;
+    }
+  }, [sunTexture]);
 
   const localRef = useRef<THREE.Group | null>(null);
   useFrame(({ clock }) => {
@@ -1193,18 +1170,30 @@ function SunModel({ onClick, onPointerOver, onPointerOut, expansionFactor, warpM
 
   return (
     <group ref={localRef}>
-      <primitive
-        object={clonedScene}
-        scale={[35, 35, 35]}
-      />
-      {/* Invisible raycast click target shell */}
       <mesh
         onClick={onClick}
         onPointerOver={onPointerOver}
         onPointerOut={onPointerOut}
       >
-        <sphereGeometry args={[38, 16, 16]} />
-        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+        <sphereGeometry args={[34.8, 64, 64]} />
+        {warpMode === "normal" ? (
+          <meshStandardMaterial
+            map={sunTexture}
+            color="#ffffff"
+            emissive="#ffffff"
+            emissiveMap={sunTexture}
+            emissiveIntensity={1.2}
+            roughness={0.5}
+            metalness={0.1}
+          />
+        ) : (
+          <meshBasicMaterial
+            color={warpMode === "hologram" ? "#00FFCC" : "#FF00FF"}
+            wireframe={true}
+            transparent
+            opacity={0.8}
+          />
+        )}
       </mesh>
     </group>
   );
@@ -1247,10 +1236,7 @@ export function StoryCanvas({ activeSection, onPlanetClick, loaderProgress = 100
     return Math.min((loaderProgress - 50) / 25, 1.0);
   }, [loaderProgress]);
 
-  const creatorOpacity = useMemo(() => {
-    if (loaderProgress < 75) return 0;
-    return Math.min((loaderProgress - 75) / 15, 1.0);
-  }, [loaderProgress]);
+
 
   // Warp speed flags
   const isWarping = (activeSection !== "home" && currentWorld === "home") || isDimensionTransition;
@@ -1306,7 +1292,8 @@ export function StoryCanvas({ activeSection, onPlanetClick, loaderProgress = 100
   return (
     <div className="absolute inset-0 z-10 w-full h-full pointer-events-auto bg-[#020205]">
       <Canvas
-        camera={{ position: [0, 80, 450], fov: 45 }}
+        shadows={{ type: THREE.PCFShadowMap }}
+        camera={{ position: [0, 80, 650], fov: 45 }}
         gl={{ antialias: true, alpha: false }}
         onCreated={({ gl }) => {
           gl.setClearColor(new THREE.Color("#020205"));
@@ -1315,11 +1302,21 @@ export function StoryCanvas({ activeSection, onPlanetClick, loaderProgress = 100
         }}
       >
         {/* Cinematic light system */}
-        <ambientLight intensity={0.03} />
+        <ambientLight intensity={0.015} />
         {isSunIgnitePhase && (
-          <pointLight position={[0, 0, 0]} intensity={22} distance={900} decay={1.0} color="#FFD580" />
+          <pointLight
+            position={[0, 0, 0]}
+            intensity={24}
+            distance={950}
+            decay={1.0}
+            color="#FFD580"
+            castShadow
+            shadow-mapSize={[1024, 1024]}
+            shadow-bias={-0.0005}
+          />
         )}
-        <directionalLight position={[0, 100, -80]} intensity={0.3} color="#D8B4FE" />
+        <directionalLight position={[0, 100, -80]} intensity={0.25} color="#D8B4FE" />
+        <directionalLight position={[0, -100, 80]} intensity={0.15} color="#3B82F6" />
 
         {/* Global deep space elements */}
         <Starfield warp={isWarping} warpMode={warpMode} />
@@ -1346,18 +1343,54 @@ export function StoryCanvas({ activeSection, onPlanetClick, loaderProgress = 100
             {expansionFactor > 0 && (
               <>
                 {/* Orbit path rings */}
-                <OrbitRing radius={110} color="#3B82F6" active={hoveredPlanet === "Earth"} opacity={expansionFactor} warpMode={warpMode} />
-                <OrbitRing radius={160} color="#DC2626" active={hoveredPlanet === "Mars"} opacity={expansionFactor} warpMode={warpMode} />
-                <OrbitRing radius={220} color="#D97706" active={hoveredPlanet === "Saturn"} opacity={expansionFactor} warpMode={warpMode} />
-                <OrbitRing radius={290} color="#0891B2" active={hoveredPlanet === "Neptune"} opacity={expansionFactor} warpMode={warpMode} />
+                <OrbitRing radius={55} color="#9E9E9E" active={hoveredPlanet === "Mercury"} opacity={expansionFactor} warpMode={warpMode} />
+                <OrbitRing radius={85} color="#E6C280" active={hoveredPlanet === "Venus"} opacity={expansionFactor} warpMode={warpMode} />
+                <OrbitRing radius={115} color="#3B82F6" active={hoveredPlanet === "Earth"} opacity={expansionFactor} warpMode={warpMode} />
+                <OrbitRing radius={150} color="#DC2626" active={hoveredPlanet === "Mars"} opacity={expansionFactor} warpMode={warpMode} />
+                <OrbitRing radius={225} color="#D4A373" active={hoveredPlanet === "Jupiter"} opacity={expansionFactor} warpMode={warpMode} />
+                <OrbitRing radius={295} color="#F59E0B" active={hoveredPlanet === "Saturn"} opacity={expansionFactor} warpMode={warpMode} />
+                <OrbitRing radius={360} color="#A0E0E0" active={hoveredPlanet === "Uranus"} opacity={expansionFactor} warpMode={warpMode} />
+                <OrbitRing radius={425} color="#06B6D4" active={hoveredPlanet === "Neptune"} opacity={expansionFactor} warpMode={warpMode} />
                 <OrbitRing radius={70} color="#9ca3af" active={hoveredPlanet === "Moon"} opacity={expansionFactor} warpMode={warpMode} />
+
+                {/* Mercury (Decorative) */}
+                <Planet
+                  name="Mercury"
+                  role="System Monitor"
+                  radius={4.8}
+                  orbitRadius={55}
+                  orbitSpeed={0.095}
+                  color="#9E9E9E"
+                  texturePattern="mercury"
+                  onClick={() => {}}
+                  onHoverChange={(h) => setHoveredPlanet(h ? "Mercury" : null)}
+                  expansionFactor={expansionFactor}
+                  warpMode={warpMode}
+                  isInteractive={false}
+                />
+
+                {/* Venus (Decorative) */}
+                <Planet
+                  name="Venus"
+                  role="Atmosphere Cache"
+                  radius={9.5}
+                  orbitRadius={85}
+                  orbitSpeed={0.075}
+                  color="#E6C280"
+                  texturePattern="venus"
+                  onClick={() => {}}
+                  onHoverChange={(h) => setHoveredPlanet(h ? "Venus" : null)}
+                  expansionFactor={expansionFactor}
+                  warpMode={warpMode}
+                  isInteractive={false}
+                />
 
                 {/* Earth (Projects) */}
                 <Planet
                   name="Earth"
                   role="Projects"
                   radius={10.5}
-                  orbitRadius={110}
+                  orbitRadius={115}
                   orbitSpeed={0.065}
                   color="#3B82F6"
                   texturePattern="earth"
@@ -1372,8 +1405,8 @@ export function StoryCanvas({ activeSection, onPlanetClick, loaderProgress = 100
                   name="Mars"
                   role="Experience"
                   radius={7.7}
-                  orbitRadius={160}
-                  orbitSpeed={0.045}
+                  orbitRadius={150}
+                  orbitSpeed={0.05}
                   color="#DC2626"
                   texturePattern="mars"
                   onClick={() => onPlanetClick("experience")}
@@ -1382,13 +1415,29 @@ export function StoryCanvas({ activeSection, onPlanetClick, loaderProgress = 100
                   warpMode={warpMode}
                 />
 
+                {/* Jupiter (Decorative) */}
+                <Planet
+                  name="Jupiter"
+                  role="Mainframe Host"
+                  radius={22.0}
+                  orbitRadius={225}
+                  orbitSpeed={0.035}
+                  color="#D4A373"
+                  texturePattern="jupiter"
+                  onClick={() => {}}
+                  onHoverChange={(h) => setHoveredPlanet(h ? "Jupiter" : null)}
+                  expansionFactor={expansionFactor}
+                  warpMode={warpMode}
+                  isInteractive={false}
+                />
+
                 {/* Saturn (Skills) */}
                 <Planet
                   name="Saturn"
                   role="Skills"
                   radius={16.8}
-                  orbitRadius={220}
-                  orbitSpeed={0.03}
+                  orbitRadius={295}
+                  orbitSpeed={0.025}
                   color="#F59E0B"
                   texturePattern="saturn"
                   onClick={() => onPlanetClick("skills")}
@@ -1397,13 +1446,29 @@ export function StoryCanvas({ activeSection, onPlanetClick, loaderProgress = 100
                   warpMode={warpMode}
                 />
 
+                {/* Uranus (Decorative) */}
+                <Planet
+                  name="Uranus"
+                  role="Cold Storage"
+                  radius={13.5}
+                  orbitRadius={360}
+                  orbitSpeed={0.018}
+                  color="#A0E0E0"
+                  texturePattern="uranus"
+                  onClick={() => {}}
+                  onHoverChange={(h) => setHoveredPlanet(h ? "Uranus" : null)}
+                  expansionFactor={expansionFactor}
+                  warpMode={warpMode}
+                  isInteractive={false}
+                />
+
                 {/* Neptune (Contact) */}
                 <Planet
                   name="Neptune"
                   role="Contact"
                   radius={14.0}
-                  orbitRadius={290}
-                  orbitSpeed={0.02}
+                  orbitRadius={425}
+                  orbitSpeed={0.012}
                   color="#06B6D4"
                   texturePattern="neptune"
                   onClick={() => onPlanetClick("contact")}
@@ -1434,7 +1499,7 @@ export function StoryCanvas({ activeSection, onPlanetClick, loaderProgress = 100
             {loaderProgress >= 70 && <AsteroidBelt opacity={expansionFactor} />}
             {loaderProgress >= 40 && <SolarWind warp={isWarping} opacity={expansionFactor} />}
             {loaderProgress >= 80 && <ShootingComet />}
-            {loaderProgress >= 75 && <CelestialCreator opacity={creatorOpacity} />}
+
 
             {/* Sun Core */}
             {isSunIgnitePhase && (
@@ -1492,12 +1557,12 @@ export function StoryCanvas({ activeSection, onPlanetClick, loaderProgress = 100
 
                 {/* Sun Hover Detail Overlay */}
                 {sunHovered && expansionFactor >= 0.9 && (
-                  <Html distanceFactor={35} position={[0, 48, 0]}>
-                    <div className="bg-black/90 border border-amber-500 text-center text-white p-4 rounded shadow-[0_0_20px_rgba(245,158,11,0.4)] flex flex-col gap-1.5 w-52 pointer-events-none select-none tracking-widest font-mono z-50">
-                      <span className="text-amber-500 font-extrabold text-[9px] tracking-[0.2em]">// SOLAR_CORE</span>
-                      <h3 className="text-xs font-bold text-white uppercase tracking-[0.15em] mt-0.5">AMEY SAWANT</h3>
+                  <Html distanceFactor={300} position={[0, 48, 0]}>
+                    <div className="bg-black/95 border border-amber-500 text-center text-white p-4.5 rounded shadow-[0_0_20px_rgba(245,158,11,0.4)] flex flex-col gap-2 w-56 pointer-events-none select-none tracking-widest font-mono z-50">
+                      <span className="text-amber-500 font-extrabold text-[10px] tracking-[0.2em]">// SOLAR_CORE</span>
+                      <h3 className="text-sm font-bold text-white uppercase tracking-[0.15em] mt-0.5">AMEY SAWANT</h3>
                       <div className="w-full h-[1px] bg-amber-500/30 my-1" />
-                      <div className="text-[8px] text-neutral-300 flex flex-col gap-0.5 tracking-wider uppercase">
+                      <div className="text-[9.5px] text-neutral-300 flex flex-col gap-1 tracking-wider uppercase">
                         <span>Developer</span>
                         <span>AI Explorer</span>
                         <span>Universe Creator</span>
@@ -1517,10 +1582,13 @@ export function StoryCanvas({ activeSection, onPlanetClick, loaderProgress = 100
   );
 }
 
-useGLTF.preload("/models/sun.glb");
+
 
 // Preload all planet & environment textures
 useTexture.preload(SUN_TEXTURE_PATH);
 useTexture.preload(STARFIELD_TEXTURE_PATH);
 useTexture.preload(EARTH_CLOUDS_PATH);
+useTexture.preload(EARTH_NORMAL_PATH);
+useTexture.preload(EARTH_ROUGHNESS_PATH);
+useTexture.preload(SATURN_RING_PATH);
 Object.values(TEXTURE_PATHS).forEach((path) => useTexture.preload(path));

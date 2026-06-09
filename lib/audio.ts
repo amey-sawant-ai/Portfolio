@@ -219,29 +219,7 @@ class CosmicAudioManager {
   }
 
   speakNarrative(text: string) {
-    if (this.isMuted || typeof window === "undefined" || !window.speechSynthesis) return;
-    
-    try {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      const voices = window.speechSynthesis.getVoices();
-      
-      // Look for a deep male/robotic English voice
-      const maleVoice = voices.find(
-        (v) =>
-          v.lang.startsWith("en") &&
-          (v.name.includes("Male") || v.name.includes("Google") || v.name.includes("Microsoft"))
-      );
-      if (maleVoice) utterance.voice = maleVoice;
-
-      utterance.pitch = 0.75;
-      utterance.rate = 0.82;
-      utterance.volume = 0.75;
-      
-      window.speechSynthesis.speak(utterance);
-    } catch (e) {
-      console.warn("SpeechSynthesis error:", e);
-    }
+    // Navigation text-to-speech voice disabled
   }
 
   toggleMute() {

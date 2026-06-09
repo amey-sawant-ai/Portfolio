@@ -120,7 +120,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="min-h-screen bg-background text-foreground overflow-x-hidden">
+      <body suppressHydrationWarning className="min-h-screen bg-background text-foreground overflow-x-hidden">
         {/*
           Future: Page transition wrapper will go here.
           When Framer Motion is added, wrap {children} with <AnimatePresence>

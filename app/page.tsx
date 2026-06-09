@@ -33,14 +33,16 @@ export default function Home() {
     setMounted(true);
     setWebglSupported(isWebGLAvailable());
 
-    // Suppress internal THREE.Clock deprecation warnings from React Three Fiber
+    // Suppress internal THREE.Clock and PCFSoftShadowMap deprecation warnings from React Three Fiber/Three.js
     const originalWarn = console.warn;
     console.warn = (...args) => {
-      if (
-        args[0] &&
-        typeof args[0] === "string" &&
-        args[0].includes("THREE.Clock: This module has been deprecated")
-      ) {
+      const isDeprecatedWarning = args.some(arg => 
+        typeof arg === "string" && (
+          arg.includes("THREE.Clock: This module has been deprecated") ||
+          arg.includes("PCFSoftShadowMap has been deprecated")
+        )
+      );
+      if (isDeprecatedWarning) {
         return;
       }
       originalWarn(...args);
