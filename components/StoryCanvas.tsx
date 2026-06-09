@@ -1303,10 +1303,10 @@ function CameraDirector({ activeSection, currentWorld }: { activeSection: string
       if (currentWorld !== "experience") {
         let targetPos = new THREE.Vector3(0, 20, 85);
         if (currentWorld === "skills") targetPos.set(0, 45, 110);
-        if (currentWorld === "about") targetPos.set(0, 5, 80);
+        if (currentWorld === "about") targetPos.set(0, 0, 80);
 
         camera.position.lerp(targetPos, 0.1);
-        camera.lookAt(new THREE.Vector3(0, currentWorld === "about" ? 5 : 12, 0));
+        camera.lookAt(new THREE.Vector3(0, currentWorld === "about" ? 0 : 12, 0));
       }
       return;
     }

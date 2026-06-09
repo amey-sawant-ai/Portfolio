@@ -27,50 +27,50 @@ function SolarStormLoops() {
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
     if (loop1Ref.current) {
-      loop1Ref.current.rotation.x = t * 0.15;
-      loop1Ref.current.rotation.y = t * 0.25;
+      loop1Ref.current.rotation.x = t * 0.12;
+      loop1Ref.current.rotation.y = t * 0.18;
     }
     if (loop2Ref.current) {
-      loop2Ref.current.rotation.y = -t * 0.3;
-      loop2Ref.current.rotation.z = t * 0.12;
+      loop2Ref.current.rotation.y = -t * 0.2;
+      loop2Ref.current.rotation.z = t * 0.1;
     }
     if (loop3Ref.current) {
-      loop3Ref.current.rotation.x = -t * 0.22;
-      loop3Ref.current.rotation.z = -t * 0.18;
+      loop3Ref.current.rotation.x = -t * 0.15;
+      loop3Ref.current.rotation.z = -t * 0.12;
     }
   });
 
   return (
-    <group position={[0, 15, -15]} scale={1.2}>
-      {/* Loop 1: Inner Solar Flare Loop */}
+    <group position={[0, 0, 0]} scale={1.2}>
+      {/* Loop 1: Inner Solar Flare Loop - Bright Orange */}
       <mesh ref={loop1Ref}>
-        <torusGeometry args={[13.5, 0.45, 16, 64]} />
+        <torusGeometry args={[13.5, 0.08, 16, 100]} />
         <meshBasicMaterial
           color="#FF7800"
           transparent
-          opacity={0.7}
+          opacity={0.85}
           blending={THREE.AdditiveBlending}
         />
       </mesh>
 
-      {/* Loop 2: Middle Prominence Loop */}
+      {/* Loop 2: Middle Prominence Loop - Cosmic Purple */}
       <mesh ref={loop2Ref} rotation={[Math.PI / 4, Math.PI / 4, 0]}>
-        <torusGeometry args={[15.0, 0.35, 16, 64]} />
+        <torusGeometry args={[15.2, 0.08, 16, 100]} />
         <meshBasicMaterial
-          color="#F59E0B"
+          color="#8B5CF6"
           transparent
-          opacity={0.55}
+          opacity={0.75}
           blending={THREE.AdditiveBlending}
         />
       </mesh>
 
-      {/* Loop 3: Outer Coronal Loop */}
+      {/* Loop 3: Outer Coronal Loop - Electric Cyan */}
       <mesh ref={loop3Ref} rotation={[-Math.PI / 6, 0, Math.PI / 3]}>
-        <torusGeometry args={[17.2, 0.25, 16, 64]} />
+        <torusGeometry args={[17.0, 0.08, 16, 100]} />
         <meshBasicMaterial
-          color="#EF4444"
+          color="#06B6D4"
           transparent
-          opacity={0.4}
+          opacity={0.65}
           blending={THREE.AdditiveBlending}
         />
       </mesh>
@@ -122,11 +122,12 @@ export default function CreatorWorld({ onBack }: CreatorWorldProps) {
     }
   ], []);
 
-  // Gold-orange creator silhouette shader material
+  // Volumetric glowing core shader material
   const silhouetteMaterial = useMemo(() => {
     return new THREE.ShaderMaterial({
       uniforms: {
-        glowColor: { value: new THREE.Color("#F59E0B") }
+        glowColor: { value: new THREE.Color("#FF7800") },
+        coreColor: { value: new THREE.Color("#FFE4B5") }
       },
       vertexShader: `
         varying vec3 vNormal;
@@ -140,13 +141,24 @@ export default function CreatorWorld({ onBack }: CreatorWorldProps) {
       `,
       fragmentShader: `
         uniform vec3 glowColor;
+        uniform vec3 coreColor;
         varying vec3 vNormal;
         varying vec3 vViewPosition;
         void main() {
           vec3 normal = normalize(vNormal);
           vec3 viewDir = normalize(vViewPosition);
-          float intensity = pow(1.0 - clamp(dot(normal, viewDir), 0.0, 1.0), 3.0);
-          gl_FragColor = vec4(glowColor * intensity * 2.2, intensity * 0.95);
+          
+          // Fresnel rim glow
+          float rim = pow(1.0 - clamp(dot(normal, viewDir), 0.0, 1.0), 2.5);
+          
+          // Solid center dot product
+          float centerIntensity = clamp(dot(normal, viewDir), 0.0, 1.0);
+          
+          // Blend core color at center and corona color at the rim
+          vec3 baseColor = mix(glowColor * 0.4, coreColor, pow(centerIntensity, 1.2));
+          vec3 finalColor = baseColor + glowColor * rim * 2.0;
+          
+          gl_FragColor = vec4(finalColor, 0.95 + rim * 0.05);
         }
       `,
       transparent: true,
@@ -182,7 +194,7 @@ export default function CreatorWorld({ onBack }: CreatorWorldProps) {
       groupRef.current.rotation.y = t * 0.04;
     }
     if (silhouetteRef.current) {
-      silhouetteRef.current.position.y = 15 + Math.sin(t * 1.2) * 1.5;
+      silhouetteRef.current.position.y = Math.sin(t * 1.2) * 1.2;
     }
   });
 
@@ -190,7 +202,7 @@ export default function CreatorWorld({ onBack }: CreatorWorldProps) {
     <group>
       {/* High Intensity Solar Lighting */}
       <ambientLight intensity={0.4} />
-      <pointLight position={[0, 15, 0]} intensity={25} distance={300} color="#FF9F1C" />
+      <pointLight position={[0, 0, 0]} intensity={25} distance={300} color="#FF9F1C" />
       <directionalLight position={[0, 100, 0]} intensity={0.8} color="#FFFbeb" />
 
       {/* Rotating Solar Swirl Group */}
@@ -266,7 +278,7 @@ export default function CreatorWorld({ onBack }: CreatorWorldProps) {
       </group>
 
       {/* Creator Portrait Silhouette at Solar Core Center */}
-      <mesh ref={silhouetteRef} position={[0, 15, -15]} scale={1.2}>
+      <mesh ref={silhouetteRef} position={[0, 0, 0]} scale={1.2}>
         <sphereGeometry args={[12, 64, 64]} />
         <primitive object={silhouetteMaterial} attach="material" />
       </mesh>
