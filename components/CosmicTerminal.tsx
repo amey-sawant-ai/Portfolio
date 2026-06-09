@@ -131,9 +131,7 @@ export function CosmicTerminal({ onWarp, onClose, currentSection }: CosmicTermin
             sun: "about",
             about: "about",
             home: "home",
-            system: "home",
-            singularity: "easter-egg",
-            "easter-egg": "easter-egg"
+            system: "home"
           };
 
           if (destinations[arg]) {

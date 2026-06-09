@@ -650,66 +650,6 @@ function ResumeOverlay({ onBack }: { onBack: () => void }) {
   );
 }
 
-// 7. EASTER EGG (BLACK HOLE)
-function EasterEggOverlay({ onBack }: { onBack: () => void }) {
-  const codeDumps = [
-    "SYS_OVERRIDE: INITIALIZE GRAVITATIONAL_SINGULARITY...",
-    "MASS: 1.2 x 10^30 KG // RADIUS: CRITICAL",
-    "EVENT_HORIZON: DETECTED // ESCAPE_VELOCITY: > c",
-    "WARNING: QUANTUM INFORMATION HOLOGRAPHIC REDUCTION ACTIVE",
-    "RE-ROUTING MATRIX ENGINE BOUNDS...",
-    "CONGRATULATIONS. YOU FOUND THE SECRETS OF THE COSMIC CREATOR."
-  ];
-
-  return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 1.2 }}
-      className="absolute inset-0 flex items-center justify-center p-6 md:p-12 z-30 select-text bg-black/60 backdrop-blur-sm"
-    >
-      <div className="w-full max-w-xl border border-red-500/20 bg-black/80 p-8 rounded font-mono text-[10px] text-red-500/80 space-y-4 relative shadow-[0_0_50px_rgba(239,68,68,0.2)]">
-        <span className="absolute top-0 left-0 w-2 h-2 border-t border-l border-red-500/50" />
-        <span className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-red-500/50" />
-
-        <div className="flex justify-between items-center border-b border-red-500/20 pb-3 mb-2">
-          <span className="font-bold tracking-widest text-red-500 flex items-center gap-1.5 uppercase animate-pulse">
-            <Radio className="w-3.5 h-3.5 text-red-500" />
-            CRITICAL SYSTEM WARP ERROR
-          </span>
-          <button 
-            onClick={onBack}
-            className="text-[9px] border border-red-500/40 text-red-500 px-3 py-1 hover:bg-red-500/10 rounded transition-colors pointer-events-auto"
-          >
-            [ DISCONNECT ]
-          </button>
-        </div>
-
-        <div className="space-y-1.5 text-left leading-relaxed">
-          {codeDumps.map((line, idx) => (
-            <motion.div 
-              key={idx}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: idx * 0.3 }}
-              className="flex gap-2"
-            >
-              <span>&gt;</span>
-              <span>{line}</span>
-            </motion.div>
-          ))}
-        </div>
-
-        <div className="pt-4 border-t border-red-500/10 flex items-center justify-center gap-2">
-          <Sparkles className="w-4 h-4 text-red-500 animate-spin" />
-          <span className="text-[8px] text-red-500/40 uppercase tracking-widest">WORMHOLE STABLE // WARP MATRIX ACTIVE</span>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
 export function SectionOverlays({ activeSection, onBack }: SectionOverlayProps) {
   return (
     <AnimatePresence mode="wait">
@@ -730,9 +670,6 @@ export function SectionOverlays({ activeSection, onBack }: SectionOverlayProps) 
       )}
       {activeSection === "resume" && (
         <ResumeOverlay key="resume" onBack={onBack} />
-      )}
-      {activeSection === "easter-egg" && (
-        <EasterEggOverlay key="easter-egg" onBack={onBack} />
       )}
     </AnimatePresence>
   );

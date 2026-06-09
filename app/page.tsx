@@ -66,8 +66,7 @@ export default function Home() {
       skills: "The tools used to shape this universe.",
       experience: "Every world begins with a journey.",
       contact: "Open a communication channel.",
-      resume: "The records of this universe.",
-      "easter-egg": "CRITICAL ERROR: Warp core singularity initialized."
+      resume: "The records of this universe."
     };
 
     const text = narrationScript[activeSection] || "";
@@ -151,8 +150,6 @@ export default function Home() {
         return { phase: "05 // NEPTUNE_VOID", name: "CONTACT WORLD" };
       case "resume":
         return { phase: "06 // LUNAR_FIELD", name: "RESUME WORLD" };
-      case "easter-egg":
-        return { phase: "99 // SINGULARITY", name: "WARP CORE" };
       default:
         return { phase: "00 // CODESPACE", name: "SYSTEM OVERVIEW" };
     }

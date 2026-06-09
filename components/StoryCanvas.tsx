@@ -436,13 +436,13 @@ function SpiralGalaxy() {
   );
 }
 
-// Particle Cosmic Starfield with warp scale capability
+// Particle Cosmic Starfield with warp scale capability and twinkling
 function Starfield({ warp, warpMode = "normal" }: { warp: boolean; warpMode?: string }) {
-  const farStars = useMemo(() => {
+  // Helper to generate star coordinates in spherical shells
+  const generateStars = (count: number, minRadius: number, deltaRadius: number) => {
     const coords = [];
-    const count = 7000;
     for (let i = 0; i < count; i++) {
-      const radius = 400 + Math.random() * 600;
+      const radius = minRadius + Math.random() * deltaRadius;
       const theta = Math.random() * 2.0 * Math.PI;
       const phi = Math.acos(2.0 * Math.random() - 1.0);
       coords.push(
@@ -452,37 +452,65 @@ function Starfield({ warp, warpMode = "normal" }: { warp: boolean; warpMode?: st
       );
     }
     return new Float32Array(coords);
-  }, []);
+  };
 
-  const nearStars = useMemo(() => {
-    const coords = [];
-    const count = 1200;
-    for (let i = 0; i < count; i++) {
-      const radius = 200 + Math.random() * 200;
-      const theta = Math.random() * 2.0 * Math.PI;
-      const phi = Math.acos(2.0 * Math.random() - 1.0);
-      coords.push(
-        radius * Math.sin(phi) * Math.cos(theta),
-        radius * Math.cos(phi),
-        radius * Math.sin(phi) * Math.sin(theta)
-      );
-    }
-    return new Float32Array(coords);
-  }, []);
+  const farStarsA = useMemo(() => generateStars(3500, 400, 600), []);
+  const farStarsB = useMemo(() => generateStars(3500, 400, 600), []);
+  const nearStarsA = useMemo(() => generateStars(400, 200, 200), []);
+  const nearStarsB = useMemo(() => generateStars(400, 200, 200), []);
+  const nearStarsC = useMemo(() => generateStars(400, 200, 200), []);
 
-  const farRef = useRef<THREE.Points | null>(null);
-  const nearRef = useRef<THREE.Points | null>(null);
+  const farRefA = useRef<THREE.Points | null>(null);
+  const farRefB = useRef<THREE.Points | null>(null);
+  const nearRefA = useRef<THREE.Points | null>(null);
+  const nearRefB = useRef<THREE.Points | null>(null);
+  const nearRefC = useRef<THREE.Points | null>(null);
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
-    if (farRef.current) {
-      farRef.current.rotation.y = t * 0.0012;
-      // Stretches star meshes during warp transitions
-      farRef.current.scale.z = warp ? 3.5 : 1.0;
+
+    // 1. Rotate, scale, and modulate opacity of far stars
+    if (farRefA.current) {
+      farRefA.current.rotation.y = t * 0.0012;
+      farRefA.current.scale.z = warp ? 3.5 : 1.0;
+      const mat = farRefA.current.material as THREE.PointsMaterial;
+      if (mat) {
+        mat.opacity = (0.35 + Math.sin(t * 1.5) * 0.15) * (warp ? 0.2 : 1.0);
+      }
     }
-    if (nearRef.current) {
-      nearRef.current.rotation.y = t * 0.004;
-      nearRef.current.scale.z = warp ? 5.0 : 1.0;
+    if (farRefB.current) {
+      farRefB.current.rotation.y = -t * 0.0008;
+      farRefB.current.scale.z = warp ? 3.5 : 1.0;
+      const mat = farRefB.current.material as THREE.PointsMaterial;
+      if (mat) {
+        mat.opacity = (0.35 + Math.sin(t * 0.9 + 2.0) * 0.15) * (warp ? 0.2 : 1.0);
+      }
+    }
+
+    // 2. Rotate, scale, and modulate opacity of near stars (twinkle)
+    if (nearRefA.current) {
+      nearRefA.current.rotation.y = t * 0.004;
+      nearRefA.current.scale.z = warp ? 5.0 : 1.0;
+      const mat = nearRefA.current.material as THREE.PointsMaterial;
+      if (mat) {
+        mat.opacity = (0.6 + Math.sin(t * 2.5) * 0.25) * (warp ? 0.2 : 1.0);
+      }
+    }
+    if (nearRefB.current) {
+      nearRefB.current.rotation.y = -t * 0.003;
+      nearRefB.current.scale.z = warp ? 5.0 : 1.0;
+      const mat = nearRefB.current.material as THREE.PointsMaterial;
+      if (mat) {
+        mat.opacity = (0.6 + Math.sin(t * 1.8 + 1.2) * 0.25) * (warp ? 0.2 : 1.0);
+      }
+    }
+    if (nearRefC.current) {
+      nearRefC.current.rotation.y = t * 0.002;
+      nearRefC.current.scale.z = warp ? 5.0 : 1.0;
+      const mat = nearRefC.current.material as THREE.PointsMaterial;
+      if (mat) {
+        mat.opacity = (0.6 + Math.sin(t * 1.0 + 2.8) * 0.25) * (warp ? 0.2 : 1.0);
+      }
     }
   });
 
@@ -507,22 +535,54 @@ function Starfield({ warp, warpMode = "normal" }: { warp: boolean; warpMode?: st
       </mesh>
 
       {/* Particle star layers for depth and warp effects */}
-      <Points ref={farRef} positions={farStars} stride={3}>
+      <Points ref={farRefA} positions={farStarsA} stride={3}>
         <PointMaterial
           size={0.45}
           color={farColor}
           transparent
-          opacity={0.5}
+          opacity={0.4}
           sizeAttenuation
           depthWrite={false}
         />
       </Points>
-      <Points ref={nearRef} positions={nearStars} stride={3}>
+      <Points ref={farRefB} positions={farStarsB} stride={3}>
+        <PointMaterial
+          size={0.35}
+          color={farColor}
+          transparent
+          opacity={0.4}
+          sizeAttenuation
+          depthWrite={false}
+        />
+      </Points>
+      <Points ref={nearRefA} positions={nearStarsA} stride={3}>
         <PointMaterial
           size={0.8}
           color={nearColor}
           transparent
-          opacity={0.8}
+          opacity={0.7}
+          sizeAttenuation
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </Points>
+      <Points ref={nearRefB} positions={nearStarsB} stride={3}>
+        <PointMaterial
+          size={0.65}
+          color={nearColor}
+          transparent
+          opacity={0.7}
+          sizeAttenuation
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </Points>
+      <Points ref={nearRefC} positions={nearStarsC} stride={3}>
+        <PointMaterial
+          size={0.9}
+          color={nearColor}
+          transparent
+          opacity={0.7}
           sizeAttenuation
           depthWrite={false}
           blending={THREE.AdditiveBlending}
@@ -670,44 +730,199 @@ function SolarWind({ warp, opacity = 1.0 }: { warp: boolean; opacity?: number })
   );
 }
 
-// Dynamic comets
+// Helper to generate a random trajectory that starts and ends completely outside the visible screen bounds
+function getRandomCometTrajectory() {
+  // Pick a random side to start from
+  // 0: Left, 1: Right, 2: Top, 3: Bottom
+  const startSide = Math.floor(Math.random() * 4);
+  
+  // Choose random coordinates for depth (Z), keeping it in visible bounds
+  const startZ = -300 - Math.random() * 200;
+  const endZ = -300 - Math.random() * 200;
+  
+  let startX = 0, startY = 0;
+  let endX = 0, endY = 0;
+  
+  if (startSide === 0) {
+    // Starts far Left, goes to Right
+    startX = -480;
+    startY = (Math.random() - 0.5) * 300 + 80;
+    
+    endX = 480;
+    endY = (Math.random() - 0.5) * 300 - 80;
+  } else if (startSide === 1) {
+    // Starts far Right, goes to Left
+    startX = 480;
+    startY = (Math.random() - 0.5) * 300 + 80;
+    
+    endX = -480;
+    endY = (Math.random() - 0.5) * 300 - 80;
+  } else if (startSide === 2) {
+    // Starts far Top, goes to Bottom
+    startX = (Math.random() - 0.5) * 600;
+    startY = 320;
+    
+    endX = (Math.random() - 0.5) * 600;
+    endY = -320;
+  } else {
+    // Starts far Bottom, goes to Top
+    startX = (Math.random() - 0.5) * 600;
+    startY = -320;
+    
+    endX = (Math.random() - 0.5) * 600;
+    endY = 320;
+  }
+  
+  return {
+    start: new THREE.Vector3(startX, startY, startZ),
+    end: new THREE.Vector3(endX, endY, endZ),
+    speed: 2.2 + Math.random() * 1.8
+  };
+}
+
+// Dynamic comets with particle trails
 function ShootingComet() {
   const cometRef = useRef<THREE.Mesh | null>(null);
+  const pointsRef = useRef<THREE.Points | null>(null);
 
   const trajectory = useMemo(() => {
+    const t = getRandomCometTrajectory();
     return {
-      start: new THREE.Vector3(-350, 120, -180),
-      end: new THREE.Vector3(350, -100, -80),
-      speed: 2.8,
-      current: new THREE.Vector3(-350, 120, -180)
+      start: t.start,
+      end: t.end,
+      speed: t.speed,
+      current: t.start.clone()
     };
   }, []);
 
-  useFrame(() => {
-    if (!cometRef.current) return;
+  const count = 40;
+  const maxLife = 50;
 
+  // Stagger particles across their lifetime initially
+  const particles = useMemo(() => {
+    const data = [];
+    for (let i = 0; i < count; i++) {
+      data.push({
+        pos: new THREE.Vector3().copy(trajectory.start),
+        vel: new THREE.Vector3(),
+        age: Math.random() * maxLife,
+        life: maxLife + Math.random() * 15,
+      });
+    }
+    return data;
+  }, [trajectory.start]);
+
+  const posArray = useMemo(() => new Float32Array(count * 3), []);
+  const colorArray = useMemo(() => new Float32Array(count * 3), []);
+
+  useFrame(() => {
+    const comet = cometRef.current;
+    if (!comet || !pointsRef.current) return;
+
+    // 1. Move Comet Head
     const direction = new THREE.Vector3().subVectors(trajectory.end, trajectory.start).normalize();
     trajectory.current.addScaledVector(direction, trajectory.speed);
-    cometRef.current.position.copy(trajectory.current);
+    comet.position.copy(trajectory.current);
 
-    if (trajectory.current.x > trajectory.end.x) {
-      trajectory.current.copy(trajectory.start);
-      trajectory.start.set(-350, 80 + Math.random() * 100, -200 - Math.random() * 100);
-      trajectory.end.set(350, -60 - Math.random() * 80, -80 + Math.random() * 60);
-      trajectory.speed = 2.4 + Math.random() * 1.2;
+    const oppositeDir = direction.clone().multiplyScalar(-1);
+
+    // 2. Update Trail Particles
+    particles.forEach((p, idx) => {
+      p.age += 1;
+      
+      // Move particles along velocity
+      p.pos.add(p.vel);
+
+      // Reset dead particles
+      if (p.age >= p.life) {
+        p.age = 0;
+        p.life = maxLife + Math.random() * 15;
+        p.pos.copy(comet.position);
+        
+        // Spawn offset
+        p.pos.x += (Math.random() - 0.5) * 1.2;
+        p.pos.y += (Math.random() - 0.5) * 1.2;
+        p.pos.z += (Math.random() - 0.5) * 1.2;
+
+        // Velocity opposite to comet movement direction with dispersion
+        p.vel.copy(oppositeDir).multiplyScalar(trajectory.speed * 0.25 + Math.random() * 0.1);
+        p.vel.x += (Math.random() - 0.5) * 0.15;
+        p.vel.y += (Math.random() - 0.5) * 0.15;
+        p.vel.z += (Math.random() - 0.5) * 0.15;
+      }
+
+      // Write position buffer
+      posArray[idx * 3] = p.pos.x;
+      posArray[idx * 3 + 1] = p.pos.y;
+      posArray[idx * 3 + 2] = p.pos.z;
+
+      // Color/Opacity transition
+      // ice-blue (#e0f2fe) -> cosmic orange (#f97316)
+      const ratio = p.age / p.life;
+      const opacity = Math.max(0, 1.0 - ratio);
+
+      const r = THREE.MathUtils.lerp(0.88, 0.98, ratio) * opacity;
+      const g = THREE.MathUtils.lerp(0.95, 0.45, ratio) * opacity;
+      const b = THREE.MathUtils.lerp(1.00, 0.09, ratio) * opacity;
+
+      colorArray[idx * 3] = r;
+      colorArray[idx * 3 + 1] = g;
+      colorArray[idx * 3 + 2] = b;
+    });
+
+    pointsRef.current.geometry.attributes.position.needsUpdate = true;
+    pointsRef.current.geometry.attributes.color.needsUpdate = true;
+
+    // Check if we reached or passed the end point
+    const distanceToStart = trajectory.current.distanceTo(trajectory.start);
+    const totalDistance = trajectory.end.distanceTo(trajectory.start);
+
+    if (distanceToStart >= totalDistance) {
+      // Reached the end! Generate a new random trajectory
+      const nextTrajectory = getRandomCometTrajectory();
+      trajectory.start.copy(nextTrajectory.start);
+      trajectory.end.copy(nextTrajectory.end);
+      trajectory.speed = nextTrajectory.speed;
+      trajectory.current.copy(nextTrajectory.start);
+
+      // Relocate all particles immediately to avoid long stretch lines
+      particles.forEach((p) => {
+        p.pos.copy(trajectory.start);
+        p.age = Math.random() * p.life;
+        p.vel.set(0, 0, 0);
+      });
     }
   });
 
   return (
-    <mesh ref={cometRef}>
-      <sphereGeometry args={[0.7, 8, 8]} />
-      <meshBasicMaterial
-        color="#ffffff"
-        transparent
-        opacity={0.8}
-        blending={THREE.AdditiveBlending}
-      />
-    </mesh>
+    <group>
+      {/* Comet Head */}
+      <mesh ref={cometRef}>
+        <sphereGeometry args={[0.7, 8, 8]} />
+        <meshBasicMaterial
+          color="#ffffff"
+          transparent
+          opacity={0.8}
+          blending={THREE.AdditiveBlending}
+        />
+      </mesh>
+
+      {/* Comet Particle Trail */}
+      <points ref={pointsRef}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[posArray, 3]} />
+          <bufferAttribute attach="attributes-color" args={[colorArray, 3]} />
+        </bufferGeometry>
+        <pointsMaterial
+          size={0.9}
+          vertexColors
+          transparent
+          sizeAttenuation
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </points>
+    </group>
   );
 }
 
@@ -1058,10 +1273,26 @@ function Planet({ name, role, radius, orbitRadius, orbitSpeed, color, texturePat
 
 function CameraDirector({ activeSection, currentWorld }: { activeSection: string; currentWorld: string }) {
   const { camera } = useThree();
-  const transitionRef = useRef<{ tStart: number; active: boolean; targetSection: string }>({ tStart: 0, active: false, targetSection: "" });
+  const currentSectionRef = useRef(activeSection);
+  const prevSectionRef = useRef("");
+
+  const transitionRef = useRef<{ tStart: number; active: boolean; targetSection: string; isFirstFrame: boolean }>({
+    tStart: 0,
+    active: false,
+    targetSection: "",
+    isFirstFrame: false
+  });
 
   useEffect(() => {
-    transitionRef.current = { tStart: Date.now(), active: true, targetSection: activeSection };
+    prevSectionRef.current = currentSectionRef.current;
+    currentSectionRef.current = activeSection;
+
+    transitionRef.current = {
+      tStart: Date.now(),
+      active: true,
+      targetSection: activeSection,
+      isFirstFrame: true
+    };
   }, [activeSection]);
 
   useFrame(({ clock }) => {
@@ -1087,17 +1318,58 @@ function CameraDirector({ activeSection, currentWorld }: { activeSection: string
       const factor = Math.min((Date.now() - transition.tStart) / duration, 1.0);
 
       if (transition.targetSection === "home") {
+        // Snap camera to leaving planet coordinates on first frame of return transition
+        if (transition.isFirstFrame) {
+          transition.isFirstFrame = false;
+
+          const leavingSection = prevSectionRef.current;
+          if (leavingSection && leavingSection !== "home") {
+            let snapPos = new THREE.Vector3(0, 0, 0);
+            if (leavingSection === "about") {
+              snapPos.set(0, 0, 85);
+            } else {
+              const spec = (PLANET_SPECS as any)[
+                leavingSection === "projects" ? "Earth" :
+                  leavingSection === "skills" ? "Saturn" :
+                    leavingSection === "experience" ? "Mars" :
+                      leavingSection === "contact" ? "Neptune" : "Moon"
+              ];
+              if (spec) {
+                const theta = spec.phase + elapsed * spec.orbitSpeed;
+                const px = Math.cos(theta) * spec.orbitRadius;
+                const pz = Math.sin(theta) * spec.orbitRadius;
+                const radialDir = new THREE.Vector3(px, 0, pz).normalize();
+                const cameraDistance = spec.radius === 16.8 ? (spec.radius * 2.3 + 15) : (spec.radius + 28);
+                snapPos.copy(radialDir).multiplyScalar(spec.orbitRadius - cameraDistance);
+                snapPos.y = 8;
+              }
+            }
+            camera.position.copy(snapPos);
+          }
+        }
         // Return back to standard overview
-        const targetPos = new THREE.Vector3(0, 70, 650);
+        const targetPos = new THREE.Vector3(0, 110, 650);
         camera.position.lerp(targetPos, 0.08);
         camera.lookAt(new THREE.Vector3(0, 0, 0));
-        if (factor >= 1.0) transition.active = false;
+
+        // Pull-back slightly narrows FOV for depth, then restores
+        const fovOffset = Math.sin(factor * Math.PI) * 10;
+        camera.fov = 45 - fovOffset;
+        camera.updateProjectionMatrix();
+
+        if (factor >= 1.0) {
+          transition.active = false;
+          camera.fov = 45;
+          camera.updateProjectionMatrix();
+        }
       } else {
         // Zooming in towards target planet coordinates
         let targetPos = new THREE.Vector3(0, 0, 0);
+        let targetLookAt = new THREE.Vector3(0, 0, 0);
 
         if (transition.targetSection === "about") {
-          targetPos.set(0, 0, 45); // Sun core
+          targetPos.set(0, 0, 85); // Zoom into Sun core (radius 34.8)
+          targetLookAt.set(0, 0, 0);
         } else {
           const spec = (PLANET_SPECS as any)[
             transition.targetSection === "projects" ? "Earth" :
@@ -1109,26 +1381,41 @@ function CameraDirector({ activeSection, currentWorld }: { activeSection: string
             const theta = spec.phase + elapsed * spec.orbitSpeed;
             const px = Math.cos(theta) * spec.orbitRadius;
             const pz = Math.sin(theta) * spec.orbitRadius;
-            // Align camera right in front of target orbiting coordinate
-            targetPos.set(px * 0.94, 2, pz * 0.94);
+            
+            // Calculate a safe camera distance that never clips the planet body or rings
+            const radialDir = new THREE.Vector3(px, 0, pz).normalize();
+            const cameraDistance = spec.radius === 16.8 ? (spec.radius * 2.3 + 15) : (spec.radius + 28);
+            
+            // Align camera slightly above the orbital plane
+            targetPos.copy(radialDir).multiplyScalar(spec.orbitRadius - cameraDistance);
+            targetPos.y = 8;
+            
+            // Look directly at the planet's moving coordinates
+            targetLookAt.set(px, 0, pz);
           }
         }
+        
+        // Eased interpolation towards moving planet
         camera.position.lerp(targetPos, 0.08);
+        camera.lookAt(targetLookAt);
 
-        if (transition.targetSection !== "about") {
-          camera.lookAt(targetPos);
-        } else {
-          camera.lookAt(new THREE.Vector3(0, 0, 0));
+        // FOV speed stretch effect
+        const fovOffset = Math.sin(factor * Math.PI) * 15;
+        camera.fov = 45 + fovOffset;
+        camera.updateProjectionMatrix();
+
+        if (factor >= 1.0) {
+          transition.active = false;
+          camera.fov = 45;
+          camera.updateProjectionMatrix();
         }
-
-        if (factor >= 1.0) transition.active = false;
       }
     } else {
       // Normal overview drift
       const t = clock.getElapsedTime();
       const overviewPos = new THREE.Vector3(
         Math.sin(t * 0.15) * 12,
-        70 + Math.cos(t * 0.12) * 8,
+        110 + Math.cos(t * 0.12) * 8,
         650
       );
       camera.position.lerp(overviewPos, 0.05);
@@ -1293,7 +1580,7 @@ export function StoryCanvas({ activeSection, onPlanetClick, loaderProgress = 100
     <div className="absolute inset-0 z-10 w-full h-full pointer-events-auto bg-[#020205]">
       <Canvas
         shadows={{ type: THREE.PCFShadowMap }}
-        camera={{ position: [0, 80, 650], fov: 45 }}
+        camera={{ position: [0, 120, 650], fov: 45 }}
         gl={{ antialias: true, alpha: false }}
         onCreated={({ gl }) => {
           gl.setClearColor(new THREE.Color("#020205"));
